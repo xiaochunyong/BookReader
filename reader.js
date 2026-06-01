@@ -32,7 +32,6 @@ function idbPromise(req) {
 
 /* === 数据管理 === */
 const SETTINGS_KEY = "htmlreader_settings";
-const LEGACY_BOOKS_KEY = "htmlreader_books";
 
 let books = [];
 let currentBook = null;
@@ -46,31 +45,6 @@ let settings = {
 };
 
 async function loadBooks() {
-  // 迁移旧 localStorage 数据
-  try {
-    const legacy = localStorage.getItem(LEGACY_BOOKS_KEY);
-    if (legacy) {
-      const oldBooks = JSON.parse(legacy);
-      const db = await openDB();
-      for (const b of oldBooks) {
-        const { content, ...meta } = b;
-        meta.currentChapter = meta.currentChapter || 0;
-        meta.currentPage = meta.currentPage || 0;
-        await idbPromise(idbStore(db, "books", "readwrite").put(meta));
-        if (content) {
-          await idbPromise(
-            idbStore(db, "content", "readwrite").put({
-              bookId: meta.id,
-              text: content,
-            }),
-          );
-        }
-      }
-      localStorage.removeItem(LEGACY_BOOKS_KEY);
-    }
-  } catch (e) {}
-
-  // 从 IndexedDB 加载书籍列表（不含正文）
   try {
     const db = await openDB();
     const list = await idbPromise(idbStore(db, "books", "readonly").getAll());
