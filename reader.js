@@ -111,15 +111,24 @@ function renderBookshelf() {
   hint.style.display = "none";
   grid.innerHTML = books
     .map(
-      (book, i) =>
-        `<div class="book-card" data-index="${i}">
-                    <button class="delete-btn" data-index="${i}">&times;</button>
-                    <div class="book-title">${escapeHtml(book.name)}</div>
-                    <div class="book-progress">
-                        共 ${book.toc ? book.toc.filter((t) => t.type === "chapter").length : "?"} 章
-                        ${book.currentChapter !== undefined ? "| 看到第 " + (book.currentChapter + 1) + " 章" : ""}
-                    </div>
-                </div>`,
+      (book, i) => {
+        const chapterCount = book.toc ? book.toc.filter((t) => t.type === "chapter").length : 0;
+        const progress = book.currentChapter !== undefined && chapterCount > 0
+          ? Math.round((book.currentChapter / chapterCount) * 100)
+          : 0;
+        return (
+          '<div class="book-card" data-index="' + i + '">' +
+          '<button class="delete-btn" data-index="' + i + '">&times;</button>' +
+          '<div class="book-title">' + escapeHtml(book.name) + "</div>" +
+          '<div class="book-progress">' +
+          '<span class="book-chapter-count">共 ' + chapterCount + " 章</span>" +
+          (book.currentChapter !== undefined
+            ? '<span class="book-read-progress">已读 ' + progress + "%</span>"
+            : '<span class="book-read-progress" style="opacity:0.5">未读</span>') +
+          "</div>" +
+          "</div>"
+        );
+      },
     )
     .join("");
 }
