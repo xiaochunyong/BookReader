@@ -240,6 +240,12 @@ body {
   color: var(--text);
   max-width: 900px;
   margin: 0 auto;
+  animation: chapterIn 0.2s ease;
+}
+
+@keyframes chapterIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .content-page p {
