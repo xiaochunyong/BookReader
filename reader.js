@@ -294,6 +294,7 @@ const CN_NUM = {
   千: 1000,
   零: 0,
   〇: 0,
+  两: 2,
 };
 
 function cnToArabic(str) {
@@ -336,9 +337,9 @@ function cnToArabic(str) {
 /* === TOC 解析 === */
 function parseTOC(content) {
   const VOLUME_RE =
-    /^[\s]*第[\s]*([一二三四五六七八九十百千零〇\d]+)[\s]*[卷册]/;
+    /^[\s]*第[\s]*([一二两三四五六七八九十百千零〇\d]+)[\s]*[卷册]/;
   const CHAPTER_RE =
-    /^[\s]*第[\s]*([一二三四五六七八九十百千零〇\d]+)[\s]*[章回节]/;
+    /^[\s]*第[\s]*([一二两三四五六七八九十百千零〇\d]+)[\s]*[章回节]/;
 
   const lines = content.split(/\r?\n/);
   const toc = [];
