@@ -42,6 +42,7 @@ let settings = {
   theme: "day",
   fontSize: 20,
   lineHeight: 1.8,
+  scrollSpeed: 600,
 };
 
 async function loadBooks() {
@@ -576,11 +577,15 @@ function initSettings() {
   const fontSizeLabel = document.getElementById("fontSizeLabel");
   const lineHeightSlider = document.getElementById("lineHeightSlider");
   const lineHeightLabel = document.getElementById("lineHeightLabel");
+  const scrollSpeedSlider = document.getElementById("scrollSpeedSlider");
+  const scrollSpeedLabel = document.getElementById("scrollSpeedLabel");
 
   fontSizeSlider.value = settings.fontSize;
   fontSizeLabel.textContent = settings.fontSize + "px";
   lineHeightSlider.value = settings.lineHeight;
   lineHeightLabel.textContent = settings.lineHeight;
+  scrollSpeedSlider.value = settings.scrollSpeed;
+  scrollSpeedLabel.textContent = settings.scrollSpeed;
 
   fontSizeSlider.addEventListener("input", () => {
     settings.fontSize = parseInt(fontSizeSlider.value);
@@ -596,10 +601,27 @@ function initSettings() {
     if (currentBook) renderContent();
   });
 
+  scrollSpeedSlider.addEventListener("input", () => {
+    settings.scrollSpeed = parseInt(scrollSpeedSlider.value);
+    scrollSpeedLabel.textContent = settings.scrollSpeed;
+    saveSettings();
+  });
+
   document.getElementById("settingsBtn").addEventListener("click", () => {
     const panel = document.getElementById("settingsPanel");
     panel.style.display = panel.style.display === "none" ? "block" : "none";
   });
+}
+
+/* === 滚动 === */
+function scrollDown() {
+  const area = document.getElementById("contentArea");
+  const atBottom = area.scrollTop + area.clientHeight >= area.scrollHeight - 10;
+  if (atBottom) {
+    nextChapter();
+  } else {
+    area.scrollBy({ top: settings.scrollSpeed, behavior: "smooth" });
+  }
 }
 
 /* === 键盘快捷键 === */
@@ -622,13 +644,12 @@ function initKeyboard() {
         e.preventDefault();
         document
           .getElementById("contentArea")
-          .scrollBy({ top: -60, behavior: "smooth" });
+          .scrollBy({ top: -settings.scrollSpeed, behavior: "smooth" });
         break;
       case "ArrowDown":
         e.preventDefault();
-        document
-          .getElementById("contentArea")
-          .scrollBy({ top: 60, behavior: "smooth" });
+        scrollDown();
+        break;
         break;
       case "Escape":
         e.preventDefault();
