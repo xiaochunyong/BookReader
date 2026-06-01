@@ -976,7 +976,14 @@ function initKeyboard() {
 /* === 路由 === */
 function updateHash() {
   if (currentBook) {
-    location.hash = "#/read/" + currentBook.id + "/" + currentChapterIdx;
+    const url =
+      location.pathname +
+      location.search +
+      "#/read/" +
+      currentBook.id +
+      "/" +
+      currentChapterIdx;
+    history.replaceState(null, "", url);
   }
 }
 
@@ -991,6 +998,11 @@ async function restoreFromHash() {
   if (!m) return false;
   const bookId = parseFloat(m[1]);
   const chapterIdx = parseInt(m[2]);
+
+  if (currentBook && currentBook.id === bookId && currentChapterIdx === chapterIdx) {
+    return true;
+  }
+
   const idx = books.findIndex((b) => b.id === bookId);
   if (idx < 0) return false;
   await openBook(idx);
