@@ -219,7 +219,6 @@ async function openBook(index) {
 
   document.getElementById("bookshelf").style.display = "none";
   document.getElementById("reader").style.display = "flex";
-  document.getElementById("bookName").textContent = currentBook.name;
 
   renderTOC();
   goToChapter(currentChapterIdx);
@@ -467,6 +466,9 @@ function updatePageInfo() {
 function goToChapter(idx) {
   currentChapterIdx = ensureChapterIdx(idx);
   currentPage = 0;
+  const entry = currentBook.toc[currentChapterIdx];
+  document.getElementById("bookName").textContent =
+    currentBook.name + (entry ? " - " + entry.title : "");
   renderTOC();
   renderContent();
 }
@@ -618,11 +620,15 @@ function initKeyboard() {
         break;
       case "ArrowUp":
         e.preventDefault();
-        prevChapter();
+        document
+          .getElementById("contentArea")
+          .scrollBy({ top: -60, behavior: "smooth" });
         break;
       case "ArrowDown":
         e.preventDefault();
-        nextChapter();
+        document
+          .getElementById("contentArea")
+          .scrollBy({ top: 60, behavior: "smooth" });
         break;
       case "Escape":
         e.preventDefault();
