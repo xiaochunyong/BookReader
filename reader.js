@@ -477,23 +477,42 @@ function renderTOC() {
 
 function renderBookmarks() {
   const list = document.getElementById("bookmarkList");
-  if (!currentBook || !currentBook.bookmarks || Object.keys(currentBook.bookmarks).length === 0) {
+  if (
+    !currentBook ||
+    !currentBook.bookmarks ||
+    Object.keys(currentBook.bookmarks).length === 0
+  ) {
     list.innerHTML = '<div class="bookmark-empty">暂无书签</div>';
     return;
   }
-  const entries = Object.entries(currentBook.bookmarks).sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
-  list.innerHTML = entries.map(([idx]) => {
-    const chapter = currentBook.toc[parseInt(idx)];
-    return '<div class="bookmark-item" data-idx="' + idx + '">' +
-      '<span class="bm-chapter">' + escapeHtml(chapter ? chapter.title : "未知章节") + '</span>' +
-      '<button class="bm-remove" data-idx="' + idx + '">×</button>' +
-      '</div>';
-  }).join("");
+  const entries = Object.entries(currentBook.bookmarks).sort(
+    (a, b) => parseInt(a[0]) - parseInt(b[0]),
+  );
+  list.innerHTML = entries
+    .map(([idx]) => {
+      const chapter = currentBook.toc[parseInt(idx)];
+      return (
+        '<div class="bookmark-item" data-idx="' +
+        idx +
+        '">' +
+        '<span class="bm-chapter">' +
+        escapeHtml(chapter ? chapter.title : "未知章节") +
+        "</span>" +
+        '<button class="bm-remove" data-idx="' +
+        idx +
+        '">×</button>' +
+        "</div>"
+      );
+    })
+    .join("");
 }
 
 function updateBookmarkBtn() {
   const btn = document.getElementById("bookmarkBtn");
-  const isBm = currentBook && currentBook.bookmarks && currentBook.bookmarks[String(currentChapterIdx)];
+  const isBm =
+    currentBook &&
+    currentBook.bookmarks &&
+    currentBook.bookmarks[String(currentChapterIdx)];
   btn.textContent = isBm ? "★" : "☆";
   if (isBm) btn.classList.add("bookmarked");
   else btn.classList.remove("bookmarked");
@@ -832,11 +851,15 @@ function initReader() {
   // 侧边栏 Tab 切换
   document.querySelectorAll(".sidebar-tab").forEach((tab) => {
     tab.addEventListener("click", () => {
-      document.querySelectorAll(".sidebar-tab").forEach((t) => t.classList.remove("active"));
+      document
+        .querySelectorAll(".sidebar-tab")
+        .forEach((t) => t.classList.remove("active"));
       tab.classList.add("active");
       var target = tab.dataset.tab;
-      document.getElementById("sidebarTOC").style.display = target === "toc" ? "block" : "none";
-      document.getElementById("sidebarBookmarks").style.display = target === "bookmarks" ? "block" : "none";
+      document.getElementById("sidebarTOC").style.display =
+        target === "toc" ? "block" : "none";
+      document.getElementById("sidebarBookmarks").style.display =
+        target === "bookmarks" ? "block" : "none";
     });
   });
 
@@ -871,8 +894,6 @@ function initReader() {
 
   // 侧边栏拖拽
   initSidebarResize();
-
-
 
   // 全文模式滚动时更新当前章节
   let scrollTick;
@@ -1022,16 +1043,6 @@ function initTheme() {
       }
     });
 
-  document
-    .getElementById("readerThemeDropdown")
-    .addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-theme]");
-      if (btn) {
-        setTheme(btn.dataset.theme);
-        document.getElementById("readerThemeDropdown").classList.remove("show");
-      }
-    });
-
   // 点击其他地方关闭下拉
   document.addEventListener("click", (e) => {
     if (!e.target.closest(".theme-switcher")) {
@@ -1083,7 +1094,9 @@ function initSettings() {
     if (btn.dataset.theme === settings.theme) btn.classList.add("active");
     btn.addEventListener("click", () => {
       setTheme(btn.dataset.theme);
-      document.querySelectorAll(".settings-theme-btns button").forEach((b) => b.classList.remove("active"));
+      document
+        .querySelectorAll(".settings-theme-btns button")
+        .forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
     });
   });
@@ -1093,10 +1106,15 @@ function initSettings() {
     if (btn.dataset.mode === settings.readMode) btn.classList.add("active");
     btn.addEventListener("click", () => {
       settings.readMode = btn.dataset.mode;
-      document.querySelectorAll(".settings-mode-btns button").forEach((b) => b.classList.remove("active"));
+      document
+        .querySelectorAll(".settings-mode-btns button")
+        .forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       saveSettings();
-      if (currentBook) { renderTOC(); renderContent(); }
+      if (currentBook) {
+        renderTOC();
+        renderContent();
+      }
     });
   });
 
