@@ -155,9 +155,18 @@ function initBookshelf() {
 
 /* === 中文数字转阿拉伯 === */
 const CN_NUM = {
-  一: 1, 二: 2, 三: 3, 四: 4, 五: 5,
-  六: 6, 七: 7, 八: 8, 九: 9, 十: 10,
-  百: 100, 千: 1000,
+  一: 1,
+  二: 2,
+  三: 3,
+  四: 4,
+  五: 5,
+  六: 6,
+  七: 7,
+  八: 8,
+  九: 9,
+  十: 10,
+  百: 100,
+  千: 1000,
 };
 
 function cnToArabic(str) {
@@ -189,7 +198,8 @@ function cnToArabic(str) {
 /* === TOC 解析 === */
 function parseTOC(content) {
   const VOLUME_RE = /^[\s]*第[\s]*([一二三四五六七八九十百千\d]+)[\s]*[卷册]/;
-  const CHAPTER_RE = /^[\s]*第[\s]*([一二三四五六七八九十百千\d]+)[\s]*[章回节]/;
+  const CHAPTER_RE =
+    /^[\s]*第[\s]*([一二三四五六七八九十百千\d]+)[\s]*[章回节]/;
 
   const lines = content.split(/\r?\n/);
   const toc = [];
@@ -218,7 +228,13 @@ function parseTOC(content) {
         startPos: pos,
       });
       currentVolume = toc.length - 1;
-      pos += line.length + (content[pos + line.length] === "\r" ? 2 : content[pos + line.length] === "\n" ? 1 : 1);
+      pos +=
+        line.length +
+        (content[pos + line.length] === "\r"
+          ? 2
+          : content[pos + line.length] === "\n"
+            ? 1
+            : 1);
       continue;
     }
 
@@ -240,7 +256,13 @@ function parseTOC(content) {
       });
     }
 
-    pos += line.length + (content[pos + line.length] === "\r" ? 2 : content[pos + line.length] === "\n" ? 1 : 1);
+    pos +=
+      line.length +
+      (content[pos + line.length] === "\r"
+        ? 2
+        : content[pos + line.length] === "\n"
+          ? 1
+          : 1);
   }
 
   // 关闭最后一个条目
@@ -261,4 +283,193 @@ function parseTOC(content) {
   }
 
   return toc;
+}
+
+/* === 目录渲染 === */
+function renderTOC() {
+    const list = document.getElementById("tocList");
+    const chapters = currentBook.toc;
+    let html = "";
+    let volumeOpen = false;
+
+    for (let i = 0; i < chapters.length; i++) {
+        const entry = chapters[i];
+        if (entry.type === "volume") {
+            if (volumeOpen) html += "</div>";
+            html += `<div class="toc-volume" data-idx="${i}">${escapeHtml(entry.title)}</div>`;
+            html += '<div class="toc-volume-chapters">';
+            volumeOpen = true;
+        } else {
+            const cls = i === currentChapterIdx ? " active" : "";
+            html += `<div class="toc-chapter${cls}" data-idx="${i}">${escapeHtml(entry.title)}</div>`;
+        }
+    }
+    if (volumeOpen) html += "</div>";
+
+    list.innerHTML = html;
+
+    // 滚动到当前章节可见
+    const active = list.querySelector(".toc-chapter.active");
+    if (active) active.scrollIntoView({ block: "nearest" });
+}
+
+/* === 内容渲染 === */
+function renderContent() {
+    const area = document.getElementById("contentArea");
+    const entry = currentBook.toc[currentChapterIdx];
+    if (!entry) return;
+
+    const content = currentBook.content;
+    const chapterText = content.substring(entry.startPos, entry.startPos + (entry.length || 0));
+    const paragraphs = chapterText.split(/\r?\n/).filter((p) => p.trim());
+
+    const fontSize = settings.fontSize;
+    const lineHeight = settings.lineHeight;
+
+    // 计算每页容纳段落数
+    const areaWidth = area.clientWidth * 0.7; // padding 15% 两侧
+    const areaHeight = area.clientHeight - 40;
+    const charWidth = fontSize * 0.6;
+    const lineHeightPx = fontSize * lineHeight;
+    const charsPerLine = Math.floor(areaWidth / charWidth);
+    const linesPerPage = Math.floor(areaHeight / lineHeightPx);
+
+    // 按段落分页
+    const pages = [];
+    let currentPageLines = [];
+    let currentLineCount = 0;
+
+    for (const para of paragraphs) {
+        // 计算该段落占多少行
+        const paraLines = Math.ceil((para.length * charWidth) / areaWidth) || 1;
+
+        if (currentLineCount + paraLines > linesPerPage && currentPageLines.length > 0) {
+            pages.push(currentPageLines.join("\n"));
+            currentPageLines = [];
+            currentLineCount = 0;
+        }
+        currentPageLines.push(para);
+        currentLineCount += paraLines;
+    }
+    if (currentPageLines.length > 0) {
+        pages.push(currentPageLines.join("\n"));
+    }
+
+    totalChapterPages = pages.length || 1;
+
+    area.innerHTML = pages
+        .map(
+            (page) =>
+                `<div class="content-page" style="--font-size:${fontSize}px;--line-height:${lineHeight}">${page
+                    .split("\n")
+                    .map((p) => `<p>${escapeHtml(p)}</p>`)
+                    .join("")}</div>`,
+        )
+        .join("");
+
+    area.scrollLeft = currentPage * area.clientWidth;
+    updatePageInfo();
+}
+
+function updatePageInfo() {
+    document.getElementById("pageInfo").textContent =
+        "第 " + (currentPage + 1) + " / " + totalChapterPages + " 页";
+}
+
+/* === 章节跳转 === */
+function goToChapter(idx) {
+    currentChapterIdx = idx;
+    currentPage = 0;
+    renderTOC();
+    renderContent();
+}
+
+function nextChapter() {
+    const allChapterIndices = currentBook.toc
+        .map((t, i) => (t.type === "chapter" ? i : -1))
+        .filter((i) => i !== -1);
+    const pos = allChapterIndices.indexOf(currentChapterIdx);
+    if (pos < allChapterIndices.length - 1) {
+        goToChapter(allChapterIndices[pos + 1]);
+    }
+}
+
+function prevChapter() {
+    const allChapterIndices = currentBook.toc
+        .map((t, i) => (t.type === "chapter" ? i : -1))
+        .filter((i) => i !== -1);
+    const pos = allChapterIndices.indexOf(currentChapterIdx);
+    if (pos > 0) {
+        goToChapter(allChapterIndices[pos - 1]);
+    }
+}
+
+/* === 翻页 === */
+function nextPage() {
+    if (currentPage < totalChapterPages - 1) {
+        currentPage++;
+        const area = document.getElementById("contentArea");
+        area.scrollLeft = currentPage * area.clientWidth;
+        updatePageInfo();
+    } else {
+        nextChapter();
+    }
+}
+
+function prevPage() {
+    if (currentPage > 0) {
+        currentPage--;
+        const area = document.getElementById("contentArea");
+        area.scrollLeft = currentPage * area.clientWidth;
+        updatePageInfo();
+    } else {
+        prevChapter();
+        // 跳到上一章最后一页
+        setTimeout(() => {
+            currentPage = totalChapterPages - 1;
+            const area = document.getElementById("contentArea");
+            area.scrollLeft = currentPage * area.clientWidth;
+            updatePageInfo();
+        }, 50);
+    }
+}
+
+/* === 滚动监听 === */
+function initScrollListener() {
+    const area = document.getElementById("contentArea");
+    area.addEventListener("scroll", () => {
+        const pageWidth = area.clientWidth;
+        const newPage = Math.round(area.scrollLeft / pageWidth);
+        if (newPage !== currentPage && newPage >= 0 && newPage < totalChapterPages) {
+            currentPage = newPage;
+            updatePageInfo();
+        }
+    });
+}
+
+/* === 阅读器事件绑定 === */
+function initReader() {
+    document.getElementById("backBtn").addEventListener("click", backToShelf);
+    document.getElementById("prevChapterBtn").addEventListener("click", prevPage);
+    document.getElementById("nextChapterBtn").addEventListener("click", nextPage);
+
+    document.getElementById("tocList").addEventListener("click", (e) => {
+        const chapter = e.target.closest(".toc-chapter");
+        if (chapter) {
+            const idx = parseInt(chapter.dataset.idx);
+            goToChapter(idx);
+        }
+    });
+
+    document.getElementById("tocToggleBtn").addEventListener("click", () => {
+        document.getElementById("tocSidebar").classList.toggle("collapsed");
+    });
+
+    initScrollListener();
+
+    window.addEventListener("resize", () => {
+        if (currentBook) {
+            renderContent();
+        }
+    });
 }
