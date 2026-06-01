@@ -746,3 +746,8 @@ body {
   color: var(--accent);
   border-color: var(--accent);
 }
+
+.content-wrapper {
+  flex: 1;
+  position: relative;
+}
