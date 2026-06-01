@@ -508,7 +508,7 @@ function updatePageInfo() {
 function scrollToChapter(idx) {
   const el = document.getElementById("ch-" + idx);
   if (el) {
-    el.scrollIntoView({ block: "start", behavior: "smooth" });
+    el.scrollIntoView({ block: "start", behavior: "auto" });
     currentChapterIdx = idx;
     updatePageInfo();
     renderTOC();
