@@ -1,12 +1,43 @@
+/* === IndexedDB === */
+const DB_NAME = "HtmlReaderDB";
+const DB_VERSION = 1;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains("books")) {
+        db.createObjectStore("books", { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains("content")) {
+        db.createObjectStore("content", { keyPath: "bookId" });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbStore(db, storeName, mode) {
+  return db.transaction(storeName, mode).objectStore(storeName);
+}
+
+function idbPromise(req) {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
 /* === 数据管理 === */
-const BOOKS_KEY = "htmlreader_books";
 const SETTINGS_KEY = "htmlreader_settings";
+const LEGACY_BOOKS_KEY = "htmlreader_books";
 
 let books = [];
 let currentBook = null;
 let currentChapterIdx = 0;
 let currentPage = 0;
-let totalChapterPages = 0;
 
 let settings = {
   theme: "day",
@@ -14,16 +45,67 @@ let settings = {
   lineHeight: 1.8,
 };
 
-function loadBooks() {
+async function loadBooks() {
+  // 迁移旧 localStorage 数据
   try {
-    books = JSON.parse(localStorage.getItem(BOOKS_KEY) || "[]");
+    const legacy = localStorage.getItem(LEGACY_BOOKS_KEY);
+    if (legacy) {
+      const oldBooks = JSON.parse(legacy);
+      const db = await openDB();
+      for (const b of oldBooks) {
+        const { content, ...meta } = b;
+        meta.currentChapter = meta.currentChapter || 0;
+        meta.currentPage = meta.currentPage || 0;
+        await idbPromise(idbStore(db, "books", "readwrite").put(meta));
+        if (content) {
+          await idbPromise(
+            idbStore(db, "content", "readwrite").put({
+              bookId: meta.id,
+              text: content,
+            }),
+          );
+        }
+      }
+      localStorage.removeItem(LEGACY_BOOKS_KEY);
+    }
+  } catch (e) {}
+
+  // 从 IndexedDB 加载书籍列表（不含正文）
+  try {
+    const db = await openDB();
+    const list = await idbPromise(idbStore(db, "books", "readonly").getAll());
+    books = list || [];
   } catch (e) {
     books = [];
   }
 }
 
-function saveBooks() {
-  localStorage.setItem(BOOKS_KEY, JSON.stringify(books));
+async function saveBookMeta(book) {
+  const db = await openDB();
+  const meta = {
+    id: book.id,
+    name: book.name,
+    toc: book.toc,
+    currentChapter: book.currentChapter,
+    currentPage: book.currentPage,
+  };
+  await idbPromise(idbStore(db, "books", "readwrite").put(meta));
+}
+
+async function saveBookContent(book) {
+  const db = await openDB();
+  await idbPromise(
+    idbStore(db, "content", "readwrite").put({
+      bookId: book.id,
+      text: book.content,
+    }),
+  );
+}
+
+async function deleteBookFromDB(id) {
+  const db = await openDB();
+  await idbPromise(idbStore(db, "books", "readwrite").delete(id));
+  await idbPromise(idbStore(db, "content", "readwrite").delete(id));
 }
 
 function loadSettings() {
@@ -70,6 +152,28 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+/* === 编码检测与解码 === */
+async function decodeText(file) {
+  const buf = await file.arrayBuffer();
+
+  // 尝试 UTF-8
+  const utf8 = new TextDecoder("utf-8", { fatal: true });
+  try {
+    return utf8.decode(buf);
+  } catch (e) {
+    // UTF-8 失败，尝试 GBK
+  }
+
+  try {
+    const gbk = new TextDecoder("gbk", { fatal: false });
+    return gbk.decode(buf);
+  } catch (e) {
+    // GBK 不可用，回退
+    const fallback = new TextDecoder("utf-8", { fatal: false });
+    return fallback.decode(buf);
+  }
+}
+
 /* === 导入 === */
 async function handleFileImport(e) {
   const files = e.target.files;
@@ -78,27 +182,31 @@ async function handleFileImport(e) {
       alert(file.name + " 不是txt文件，已跳过");
       continue;
     }
-    const text = await file.text();
+    const text = await decodeText(file);
+    const toc = parseTOC(text);
     const book = {
       id: Date.now() + Math.random(),
       name: file.name.replace(/\.txt$/i, ""),
       content: text,
       currentChapter: 0,
-      toc: [],
+      currentPage: 0,
+      toc: toc,
     };
-    book.toc = parseTOC(text);
-    books.push(book);
+    await saveBookContent(book);
+    await saveBookMeta(book);
+    const { content: _, ...meta } = book;
+    books.push(meta);
   }
-  saveBooks();
   renderBookshelf();
   e.target.value = "";
 }
 
 /* === 删除 === */
-function deleteBook(index) {
+async function deleteBook(index) {
   if (confirm("确定要删除《" + books[index].name + "》吗？")) {
+    const id = books[index].id;
+    await deleteBookFromDB(id);
     books.splice(index, 1);
-    saveBooks();
     renderBookshelf();
   }
 }
@@ -114,8 +222,18 @@ function ensureChapterIdx(idx) {
 }
 
 /* === 打开书籍 === */
-function openBook(index) {
-  currentBook = books[index];
+async function openBook(index) {
+  const meta = books[index];
+  // 从 IndexedDB 加载正文
+  const db = await openDB();
+  const record = await idbPromise(
+    idbStore(db, "content", "readonly").get(meta.id),
+  );
+  currentBook = {
+    ...meta,
+    content: record ? record.text : "",
+  };
+
   // 从存储的章节位置恢复 TOC 索引
   const chapterIndices = currentBook.toc
     .map((t, i) => (t.type === "chapter" ? i : -1))
@@ -134,7 +252,7 @@ function openBook(index) {
 }
 
 /* === 返回书架 === */
-function backToShelf() {
+async function backToShelf() {
   if (currentBook) {
     // 存储章节在全部章节中的位置（而非 TOC 索引）
     const chapterIndices = currentBook.toc
@@ -143,7 +261,14 @@ function backToShelf() {
     const pos = chapterIndices.indexOf(currentChapterIdx);
     currentBook.currentChapter = pos >= 0 ? pos : 0;
     currentBook.currentPage = currentPage;
-    saveBooks();
+
+    // 更新元数据到 IndexedDB，释放正文内存
+    await saveBookMeta(currentBook);
+    const metaIdx = books.findIndex((b) => b.id === currentBook.id);
+    if (metaIdx >= 0) {
+      books[metaIdx].currentChapter = currentBook.currentChapter;
+      books[metaIdx].currentPage = currentBook.currentPage;
+    }
     renderBookshelf();
   }
   document.getElementById("bookshelf").style.display = "block";
@@ -160,16 +285,16 @@ function initBookshelf() {
     .getElementById("fileInput")
     .addEventListener("change", handleFileImport);
 
-  document.getElementById("bookGrid").addEventListener("click", (e) => {
+  document.getElementById("bookGrid").addEventListener("click", async (e) => {
     const card = e.target.closest(".book-card");
     const delBtn = e.target.closest(".delete-btn");
     if (delBtn) {
       e.stopPropagation();
-      deleteBook(parseInt(delBtn.dataset.index));
+      await deleteBook(parseInt(delBtn.dataset.index));
       return;
     }
     if (card) {
-      openBook(parseInt(card.dataset.index));
+      await openBook(parseInt(card.dataset.index));
     }
   });
 }
@@ -394,7 +519,9 @@ function prevChapter() {
 
 /* === 阅读器事件绑定 === */
 function initReader() {
-  document.getElementById("backBtn").addEventListener("click", backToShelf);
+  document.getElementById("backBtn").addEventListener("click", async () => {
+    await backToShelf();
+  });
   document
     .getElementById("prevChapterBtn")
     .addEventListener("click", prevChapter);
@@ -525,7 +652,9 @@ function initKeyboard() {
         break;
       case "Escape":
         e.preventDefault();
-        backToShelf();
+        (async () => {
+          await backToShelf();
+        })();
         break;
       case "t":
       case "T":
@@ -540,8 +669,8 @@ function initKeyboard() {
 }
 
 /* === 初始化 === */
-function init() {
-  loadBooks();
+async function init() {
+  await loadBooks();
   loadSettings();
   setTheme(settings.theme);
   initBookshelf();
