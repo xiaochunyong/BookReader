@@ -43,6 +43,7 @@ let settings = {
   fontSize: 20,
   lineHeight: 1.8,
   scrollSpeed: 600,
+  sidebarWidth: 240,
 };
 
 async function loadBooks() {
@@ -63,6 +64,7 @@ async function saveBookMeta(book) {
     toc: book.toc,
     currentChapter: book.currentChapter,
     currentPage: book.currentPage,
+    bookmarks: book.bookmarks,
   };
   await idbPromise(idbStore(db, "books", "readwrite").put(meta));
 }
@@ -421,7 +423,10 @@ function renderTOC() {
       volumeOpen = true;
     } else {
       const cls = i === currentChapterIdx ? " active" : "";
-      html += `<div class="toc-chapter${cls}" data-idx="${i}">${escapeHtml(entry.title)}</div>`;
+      const bm = isBookmarked(i)
+        ? ' <span class="bookmark-indicator">★</span>'
+        : "";
+      html += `<div class="toc-chapter${cls}" data-idx="${i}">${escapeHtml(entry.title)}${bm}</div>`;
     }
   }
   if (volumeOpen) html += "</div>";
@@ -461,6 +466,193 @@ function renderContent() {
 function updatePageInfo() {
   const entry = currentBook.toc[currentChapterIdx];
   document.getElementById("pageInfo").textContent = entry ? entry.title : "";
+}
+
+/* === 全文检索 === */
+let searchMatches = [];
+let currentSearchIdx = -1;
+
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function doSearch(query) {
+  searchMatches = [];
+  currentSearchIdx = -1;
+  if (!currentBook || !query.trim()) {
+    renderSearchResults();
+    return;
+  }
+
+  const content = currentBook.content;
+  const lower = content.toLowerCase();
+  const q = query.toLowerCase();
+  let pos = 0;
+
+  while ((pos = lower.indexOf(q, pos)) !== -1) {
+    const start = Math.max(0, pos - 20);
+    const end = Math.min(content.length, pos + q.length + 40);
+    let chapterIdx = -1;
+    for (let i = currentBook.toc.length - 1; i >= 0; i--) {
+      if (
+        currentBook.toc[i].type === "chapter" &&
+        pos >= currentBook.toc[i].startPos
+      ) {
+        chapterIdx = i;
+        break;
+      }
+    }
+    searchMatches.push({
+      pos,
+      chapterIdx,
+      before: content.substring(start, pos),
+      match: content.substring(pos, pos + q.length),
+      after: content.substring(pos + q.length, end),
+    });
+    pos += q.length;
+    if (searchMatches.length >= 200) break;
+  }
+
+  if (searchMatches.length > 0) currentSearchIdx = 0;
+  renderSearchResults();
+}
+
+function renderSearchResults() {
+  const container = document.getElementById("searchResults");
+  const count = document.getElementById("searchCount");
+
+  if (searchMatches.length === 0) {
+    count.textContent = "";
+    container.innerHTML =
+      '<div class="search-result" style="cursor:default;color:var(--text-secondary)">无结果</div>';
+    return;
+  }
+
+  count.textContent = searchMatches.length + " 个结果";
+
+  container.innerHTML = searchMatches
+    .slice(0, 100)
+    .map((m, i) => {
+      const chapter =
+        m.chapterIdx >= 0 ? currentBook.toc[m.chapterIdx].title : "";
+      const cls =
+        i === currentSearchIdx ? ' style="background:var(--hover-bg)"' : "";
+      return (
+        '<div class="search-result" data-idx="' +
+        i +
+        '"' +
+        cls +
+        ">" +
+        '<div class="result-chapter">' +
+        escapeHtml(chapter) +
+        "</div>" +
+        '<div class="result-text">...' +
+        escapeHtml(m.before) +
+        "<em>" +
+        escapeHtml(m.match) +
+        "</em>" +
+        escapeHtml(m.after) +
+        "...</div>" +
+        "</div>"
+      );
+    })
+    .join("");
+}
+
+function jumpToSearchMatch(idx) {
+  const m = searchMatches[idx];
+  if (!m) return;
+  currentSearchIdx = idx;
+
+  if (m.chapterIdx >= 0) {
+    goToChapter(m.chapterIdx);
+  }
+
+  // 渲染后在 DOM 中标记第一个匹配
+  setTimeout(() => {
+    highlightCurrentMatch();
+  }, 100);
+
+  renderSearchResults();
+}
+
+function highlightCurrentMatch() {
+  // 清除旧高亮
+  document.querySelectorAll(".content-page mark").forEach((el) => {
+    el.parentNode.replaceChild(document.createTextNode(el.textContent), el);
+  });
+
+  const m = searchMatches[currentSearchIdx];
+  if (!m) return;
+
+  const page = document.querySelector(".content-page");
+  if (!page) return;
+
+  const regex = new RegExp("(" + escapeRegex(m.match) + ")", "gi");
+  let found = false;
+
+  function walk(node) {
+    if (found) return;
+    if (node.nodeType === 3) {
+      // Text node
+      const idx = node.textContent.toLowerCase().indexOf(m.match.toLowerCase());
+      if (idx >= 0 && !found) {
+        found = true;
+        const before = node.textContent.substring(0, idx);
+        const matched = node.textContent.substring(idx, idx + m.match.length);
+        const after = node.textContent.substring(idx + m.match.length);
+
+        const frag = document.createDocumentFragment();
+        frag.appendChild(document.createTextNode(before));
+        const mark = document.createElement("mark");
+        mark.textContent = matched;
+        mark.className = "current";
+        frag.appendChild(mark);
+        frag.appendChild(document.createTextNode(after));
+        node.parentNode.replaceChild(frag, node);
+
+        // 滚动到该位置
+        mark.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    } else if (node.nodeType === 1 && node.tagName !== "MARK") {
+      for (const child of Array.from(node.childNodes)) {
+        walk(child);
+        if (found) return;
+      }
+    }
+  }
+
+  walk(page);
+}
+
+/* === 书签 === */
+function toggleBookmark() {
+  if (!currentBook) return;
+  const entry = currentBook.toc[currentChapterIdx];
+  if (!entry || entry.type !== "chapter") return;
+
+  if (!currentBook.bookmarks) currentBook.bookmarks = {};
+  const key = String(currentChapterIdx);
+
+  if (currentBook.bookmarks[key]) {
+    delete currentBook.bookmarks[key];
+  } else {
+    currentBook.bookmarks[key] = { time: Date.now() };
+  }
+
+  // 更新元数据
+  const metaIdx = books.findIndex((b) => b.id === currentBook.id);
+  if (metaIdx >= 0) {
+    books[metaIdx].bookmarks = currentBook.bookmarks;
+  }
+  saveBookMeta(currentBook);
+  renderTOC();
+}
+
+function isBookmarked(idx) {
+  return (
+    currentBook && currentBook.bookmarks && currentBook.bookmarks[String(idx)]
+  );
 }
 
 /* === 章节跳转 === */
@@ -518,10 +710,109 @@ function initReader() {
     document.getElementById("tocSidebar").classList.toggle("collapsed");
   });
 
+  // 搜索
+  initSearch();
+
+  // 书签
+  document
+    .getElementById("bookmarkBtn")
+    .addEventListener("click", toggleBookmark);
+
+  // 侧边栏拖拽
+  initSidebarResize();
+
   window.addEventListener("resize", () => {
     if (currentBook) {
       renderContent();
     }
+  });
+}
+
+function initSearch() {
+  const searchPanel = document.getElementById("searchPanel");
+  const searchInput = document.getElementById("searchInput");
+  let searchDebounce;
+
+  document.getElementById("searchBtn").addEventListener("click", () => {
+    const show = searchPanel.style.display === "none";
+    searchPanel.style.display = show ? "flex" : "none";
+    if (show) {
+      searchInput.focus();
+      searchInput.select();
+    }
+  });
+
+  searchInput.addEventListener("input", () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => doSearch(searchInput.value), 200);
+  });
+
+  document.getElementById("searchCloseBtn").addEventListener("click", () => {
+    searchPanel.style.display = "none";
+    document.querySelectorAll(".content-page mark").forEach((el) => {
+      el.parentNode.replaceChild(document.createTextNode(el.textContent), el);
+    });
+  });
+
+  document.getElementById("searchPrevBtn").addEventListener("click", () => {
+    if (searchMatches.length === 0) return;
+    currentSearchIdx =
+      (currentSearchIdx - 1 + searchMatches.length) % searchMatches.length;
+    jumpToSearchMatch(currentSearchIdx);
+  });
+
+  document.getElementById("searchNextBtn").addEventListener("click", () => {
+    if (searchMatches.length === 0) return;
+    currentSearchIdx = (currentSearchIdx + 1) % searchMatches.length;
+    jumpToSearchMatch(currentSearchIdx);
+  });
+
+  document.getElementById("searchResults").addEventListener("click", (e) => {
+    const item = e.target.closest(".search-result");
+    if (item && item.dataset.idx !== undefined) {
+      jumpToSearchMatch(parseInt(item.dataset.idx));
+    }
+  });
+
+  searchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (searchMatches.length > 0) jumpToSearchMatch(currentSearchIdx);
+    }
+    if (e.key === "Escape") searchPanel.style.display = "none";
+  });
+}
+
+function initSidebarResize() {
+  const handle = document.getElementById("sidebarResizeHandle");
+  const sidebar = document.getElementById("tocSidebar");
+  let startX, startWidth;
+
+  handle.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    startX = e.clientX;
+    startWidth = sidebar.offsetWidth;
+    handle.classList.add("active");
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const onMove = (e) => {
+      const w = Math.max(120, Math.min(500, startWidth + e.clientX - startX));
+      sidebar.style.width = w + "px";
+    };
+
+    const onUp = () => {
+      handle.classList.remove("active");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      settings.sidebarWidth = sidebar.offsetWidth;
+      saveSettings();
+    };
+
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
   });
 }
 
@@ -650,7 +941,6 @@ function initKeyboard() {
         e.preventDefault();
         scrollDown();
         break;
-        break;
       case "Escape":
         e.preventDefault();
         (async () => {
@@ -660,10 +950,21 @@ function initKeyboard() {
       case "t":
       case "T":
         e.preventDefault();
-        // 循环切换主题
-        const themes = ["day", "night", "eye", "parchment"];
-        const idx = themes.indexOf(settings.theme);
-        setTheme(themes[(idx + 1) % themes.length]);
+        {
+          // 循环切换主题
+          const themes = ["day", "night", "eye", "parchment"];
+          const idx = themes.indexOf(settings.theme);
+          setTheme(themes[(idx + 1) % themes.length]);
+        }
+        break;
+      default:
+        if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+          e.preventDefault();
+          const panel = document.getElementById("searchPanel");
+          panel.style.display = "flex";
+          document.getElementById("searchInput").focus();
+          document.getElementById("searchInput").select();
+        }
         break;
     }
   });
@@ -674,6 +975,8 @@ async function init() {
   await loadBooks();
   loadSettings();
   setTheme(settings.theme);
+  document.getElementById("tocSidebar").style.width =
+    settings.sidebarWidth + "px";
   initBookshelf();
   initReader();
   initTheme();

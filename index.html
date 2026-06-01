@@ -54,13 +54,27 @@
               <button data-theme="parchment">羊皮纸</button>
             </div>
           </div>
+          <button class="icon-btn" id="searchBtn" title="搜索">搜索</button>
+          <button class="icon-btn" id="bookmarkBtn" title="书签">书签</button>
           <button class="icon-btn" id="settingsBtn" title="设置">设置</button>
           <button class="icon-btn" id="tocToggleBtn" title="目录">目录</button>
         </div>
       </div>
+      <!-- 搜索面板 -->
+      <div class="search-panel" id="searchPanel" style="display:none">
+        <div class="search-bar">
+          <input type="text" id="searchInput" placeholder="输入关键词搜索..." />
+          <span id="searchCount"></span>
+          <button id="searchPrevBtn">▲</button>
+          <button id="searchNextBtn">▼</button>
+          <button id="searchCloseBtn">×</button>
+        </div>
+        <div class="search-results" id="searchResults"></div>
+      </div>
       <div class="reader-body">
         <aside class="toc-sidebar" id="tocSidebar">
           <div class="toc-list" id="tocList"></div>
+          <div class="sidebar-resize-handle" id="sidebarResizeHandle"></div>
         </aside>
         <div class="content-area" id="contentArea"></div>
       </div>
