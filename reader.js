@@ -780,7 +780,9 @@ function initReader() {
   });
 
   document.getElementById("tocToggleBtn").addEventListener("click", () => {
-    document.getElementById("tocSidebar").classList.toggle("collapsed");
+    const sidebar = document.getElementById("tocSidebar");
+    const collapsed = sidebar.classList.toggle("collapsed");
+    sidebar.style.width = collapsed ? "0" : settings.sidebarWidth + "px";
   });
 
   // 搜索
