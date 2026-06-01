@@ -103,10 +103,26 @@ function deleteBook(index) {
   }
 }
 
+/* === 辅助 === */
+function ensureChapterIdx(idx) {
+  const entry = currentBook.toc[idx];
+  if (!entry || entry.type === "chapter") return idx;
+  for (let i = idx + 1; i < currentBook.toc.length; i++) {
+    if (currentBook.toc[i].type === "chapter") return i;
+  }
+  return idx;
+}
+
 /* === 打开书籍 === */
 function openBook(index) {
   currentBook = books[index];
-  currentChapterIdx = currentBook.currentChapter || 0;
+  // 从存储的章节位置恢复 TOC 索引
+  const chapterIndices = currentBook.toc
+    .map((t, i) => (t.type === "chapter" ? i : -1))
+    .filter((i) => i !== -1);
+  currentChapterIdx = ensureChapterIdx(
+    chapterIndices[currentBook.currentChapter || 0] || 0,
+  );
   currentPage = currentBook.currentPage || 0;
 
   document.getElementById("bookshelf").style.display = "none";
@@ -120,7 +136,12 @@ function openBook(index) {
 /* === 返回书架 === */
 function backToShelf() {
   if (currentBook) {
-    currentBook.currentChapter = currentChapterIdx;
+    // 存储章节在全部章节中的位置（而非 TOC 索引）
+    const chapterIndices = currentBook.toc
+      .map((t, i) => (t.type === "chapter" ? i : -1))
+      .filter((i) => i !== -1);
+    const pos = chapterIndices.indexOf(currentChapterIdx);
+    currentBook.currentChapter = pos >= 0 ? pos : 0;
     currentBook.currentPage = currentPage;
     saveBooks();
     renderBookshelf();
@@ -329,62 +350,23 @@ function renderContent() {
   const fontSize = settings.fontSize;
   const lineHeight = settings.lineHeight;
 
-  // 计算每页容纳段落数
-  const areaWidth = area.clientWidth * 0.7; // padding 15% 两侧
-  const areaHeight = area.clientHeight - 40;
-  const charWidth = fontSize * 0.6;
-  const lineHeightPx = fontSize * lineHeight;
-  const charsPerLine = Math.floor(areaWidth / charWidth);
-  const linesPerPage = Math.floor(areaHeight / lineHeightPx);
+  area.innerHTML =
+    `<div class="content-page" style="--font-size:${fontSize}px;--line-height:${lineHeight}">` +
+    paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join("") +
+    "</div>";
 
-  // 按段落分页
-  const pages = [];
-  let currentPageLines = [];
-  let currentLineCount = 0;
-
-  for (const para of paragraphs) {
-    // 计算该段落占多少行
-    const paraLines = Math.ceil((para.length * charWidth) / areaWidth) || 1;
-
-    if (
-      currentLineCount + paraLines > linesPerPage &&
-      currentPageLines.length > 0
-    ) {
-      pages.push(currentPageLines.join("\n"));
-      currentPageLines = [];
-      currentLineCount = 0;
-    }
-    currentPageLines.push(para);
-    currentLineCount += paraLines;
-  }
-  if (currentPageLines.length > 0) {
-    pages.push(currentPageLines.join("\n"));
-  }
-
-  totalChapterPages = pages.length || 1;
-
-  area.innerHTML = pages
-    .map(
-      (page) =>
-        `<div class="content-page" style="--font-size:${fontSize}px;--line-height:${lineHeight}">${page
-          .split("\n")
-          .map((p) => `<p>${escapeHtml(p)}</p>`)
-          .join("")}</div>`,
-    )
-    .join("");
-
-  area.scrollLeft = currentPage * area.clientWidth;
+  area.scrollTop = 0;
   updatePageInfo();
 }
 
 function updatePageInfo() {
-  document.getElementById("pageInfo").textContent =
-    "第 " + (currentPage + 1) + " / " + totalChapterPages + " 页";
+  const entry = currentBook.toc[currentChapterIdx];
+  document.getElementById("pageInfo").textContent = entry ? entry.title : "";
 }
 
 /* === 章节跳转 === */
 function goToChapter(idx) {
-  currentChapterIdx = idx;
+  currentChapterIdx = ensureChapterIdx(idx);
   currentPage = 0;
   renderTOC();
   renderContent();
@@ -410,58 +392,15 @@ function prevChapter() {
   }
 }
 
-/* === 翻页 === */
-function nextPage() {
-  if (currentPage < totalChapterPages - 1) {
-    currentPage++;
-    const area = document.getElementById("contentArea");
-    area.scrollLeft = currentPage * area.clientWidth;
-    updatePageInfo();
-  } else {
-    nextChapter();
-  }
-}
-
-function prevPage() {
-  if (currentPage > 0) {
-    currentPage--;
-    const area = document.getElementById("contentArea");
-    area.scrollLeft = currentPage * area.clientWidth;
-    updatePageInfo();
-  } else {
-    prevChapter();
-    // 跳到上一章最后一页
-    setTimeout(() => {
-      currentPage = totalChapterPages - 1;
-      const area = document.getElementById("contentArea");
-      area.scrollLeft = currentPage * area.clientWidth;
-      updatePageInfo();
-    }, 50);
-  }
-}
-
-/* === 滚动监听 === */
-function initScrollListener() {
-  const area = document.getElementById("contentArea");
-  area.addEventListener("scroll", () => {
-    const pageWidth = area.clientWidth;
-    const newPage = Math.round(area.scrollLeft / pageWidth);
-    if (
-      newPage !== currentPage &&
-      newPage >= 0 &&
-      newPage < totalChapterPages
-    ) {
-      currentPage = newPage;
-      updatePageInfo();
-    }
-  });
-}
-
 /* === 阅读器事件绑定 === */
 function initReader() {
   document.getElementById("backBtn").addEventListener("click", backToShelf);
-  document.getElementById("prevChapterBtn").addEventListener("click", prevPage);
-  document.getElementById("nextChapterBtn").addEventListener("click", nextPage);
+  document
+    .getElementById("prevChapterBtn")
+    .addEventListener("click", prevChapter);
+  document
+    .getElementById("nextChapterBtn")
+    .addEventListener("click", nextChapter);
 
   document.getElementById("tocList").addEventListener("click", (e) => {
     const chapter = e.target.closest(".toc-chapter");
@@ -475,8 +414,6 @@ function initReader() {
     document.getElementById("tocSidebar").classList.toggle("collapsed");
   });
 
-  initScrollListener();
-
   window.addEventListener("resize", () => {
     if (currentBook) {
       renderContent();
@@ -486,127 +423,133 @@ function initReader() {
 
 /* === 主题 === */
 function setTheme(theme) {
-    settings.theme = theme;
-    document.body.setAttribute("data-theme", theme);
-    saveSettings();
+  settings.theme = theme;
+  document.body.setAttribute("data-theme", theme);
+  saveSettings();
 }
 
 function initTheme() {
-    // 书架主题按钮
-    document.getElementById("shelfThemeBtn").addEventListener("click", () => {
-        document.getElementById("shelfThemeDropdown").classList.toggle("show");
-    });
-    document.getElementById("shelfThemeDropdown").addEventListener("click", (e) => {
-        const btn = e.target.closest("button[data-theme]");
-        if (btn) {
-            setTheme(btn.dataset.theme);
-            document.getElementById("shelfThemeDropdown").classList.remove("show");
-        }
-    });
-
-    // 阅读器主题按钮
-    document.getElementById("readerThemeBtn").addEventListener("click", () => {
-        document.getElementById("readerThemeDropdown").classList.toggle("show");
-    });
-    document.getElementById("readerThemeDropdown").addEventListener("click", (e) => {
-        const btn = e.target.closest("button[data-theme]");
-        if (btn) {
-            setTheme(btn.dataset.theme);
-            document.getElementById("readerThemeDropdown").classList.remove("show");
-        }
+  // 书架主题按钮
+  document.getElementById("shelfThemeBtn").addEventListener("click", () => {
+    document.getElementById("shelfThemeDropdown").classList.toggle("show");
+  });
+  document
+    .getElementById("shelfThemeDropdown")
+    .addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-theme]");
+      if (btn) {
+        setTheme(btn.dataset.theme);
+        document.getElementById("shelfThemeDropdown").classList.remove("show");
+      }
     });
 
-    // 点击其他地方关闭下拉
-    document.addEventListener("click", (e) => {
-        if (!e.target.closest(".theme-switcher")) {
-            document.querySelectorAll(".theme-dropdown.show").forEach((d) => d.classList.remove("show"));
-        }
+  // 阅读器主题按钮
+  document.getElementById("readerThemeBtn").addEventListener("click", () => {
+    document.getElementById("readerThemeDropdown").classList.toggle("show");
+  });
+  document
+    .getElementById("readerThemeDropdown")
+    .addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-theme]");
+      if (btn) {
+        setTheme(btn.dataset.theme);
+        document.getElementById("readerThemeDropdown").classList.remove("show");
+      }
     });
+
+  // 点击其他地方关闭下拉
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".theme-switcher")) {
+      document
+        .querySelectorAll(".theme-dropdown.show")
+        .forEach((d) => d.classList.remove("show"));
+    }
+  });
 }
 
 /* === 设置 === */
 function initSettings() {
-    const fontSizeSlider = document.getElementById("fontSizeSlider");
-    const fontSizeLabel = document.getElementById("fontSizeLabel");
-    const lineHeightSlider = document.getElementById("lineHeightSlider");
-    const lineHeightLabel = document.getElementById("lineHeightLabel");
+  const fontSizeSlider = document.getElementById("fontSizeSlider");
+  const fontSizeLabel = document.getElementById("fontSizeLabel");
+  const lineHeightSlider = document.getElementById("lineHeightSlider");
+  const lineHeightLabel = document.getElementById("lineHeightLabel");
 
-    fontSizeSlider.value = settings.fontSize;
+  fontSizeSlider.value = settings.fontSize;
+  fontSizeLabel.textContent = settings.fontSize + "px";
+  lineHeightSlider.value = settings.lineHeight;
+  lineHeightLabel.textContent = settings.lineHeight;
+
+  fontSizeSlider.addEventListener("input", () => {
+    settings.fontSize = parseInt(fontSizeSlider.value);
     fontSizeLabel.textContent = settings.fontSize + "px";
-    lineHeightSlider.value = settings.lineHeight;
+    saveSettings();
+    if (currentBook) renderContent();
+  });
+
+  lineHeightSlider.addEventListener("input", () => {
+    settings.lineHeight = parseFloat(lineHeightSlider.value);
     lineHeightLabel.textContent = settings.lineHeight;
+    saveSettings();
+    if (currentBook) renderContent();
+  });
 
-    fontSizeSlider.addEventListener("input", () => {
-        settings.fontSize = parseInt(fontSizeSlider.value);
-        fontSizeLabel.textContent = settings.fontSize + "px";
-        saveSettings();
-        if (currentBook) renderContent();
-    });
-
-    lineHeightSlider.addEventListener("input", () => {
-        settings.lineHeight = parseFloat(lineHeightSlider.value);
-        lineHeightLabel.textContent = settings.lineHeight;
-        saveSettings();
-        if (currentBook) renderContent();
-    });
-
-    document.getElementById("settingsBtn").addEventListener("click", () => {
-        const panel = document.getElementById("settingsPanel");
-        panel.style.display = panel.style.display === "none" ? "block" : "none";
-    });
+  document.getElementById("settingsBtn").addEventListener("click", () => {
+    const panel = document.getElementById("settingsPanel");
+    panel.style.display = panel.style.display === "none" ? "block" : "none";
+  });
 }
 
 /* === 键盘快捷键 === */
 function initKeyboard() {
-    document.addEventListener("keydown", (e) => {
-        if (!currentBook) return;
-        // 不在输入框内才响应
-        if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+  document.addEventListener("keydown", (e) => {
+    if (!currentBook) return;
+    // 不在输入框内才响应
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
 
-        switch (e.key) {
-            case "ArrowLeft":
-                e.preventDefault();
-                prevPage();
-                break;
-            case "ArrowRight":
-                e.preventDefault();
-                nextPage();
-                break;
-            case "ArrowUp":
-                e.preventDefault();
-                prevChapter();
-                break;
-            case "ArrowDown":
-                e.preventDefault();
-                nextChapter();
-                break;
-            case "Escape":
-                e.preventDefault();
-                backToShelf();
-                break;
-            case "t":
-            case "T":
-                e.preventDefault();
-                // 循环切换主题
-                const themes = ["day", "night", "eye", "parchment"];
-                const idx = themes.indexOf(settings.theme);
-                setTheme(themes[(idx + 1) % themes.length]);
-                break;
-        }
-    });
+    switch (e.key) {
+      case "ArrowLeft":
+        e.preventDefault();
+        prevChapter();
+        break;
+      case "ArrowRight":
+        e.preventDefault();
+        nextChapter();
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        prevChapter();
+        break;
+      case "ArrowDown":
+        e.preventDefault();
+        nextChapter();
+        break;
+      case "Escape":
+        e.preventDefault();
+        backToShelf();
+        break;
+      case "t":
+      case "T":
+        e.preventDefault();
+        // 循环切换主题
+        const themes = ["day", "night", "eye", "parchment"];
+        const idx = themes.indexOf(settings.theme);
+        setTheme(themes[(idx + 1) % themes.length]);
+        break;
+    }
+  });
 }
 
 /* === 初始化 === */
 function init() {
-    loadBooks();
-    loadSettings();
-    setTheme(settings.theme);
-    initBookshelf();
-    initReader();
-    initTheme();
-    initSettings();
-    initKeyboard();
-    renderBookshelf();
+  loadBooks();
+  loadSettings();
+  setTheme(settings.theme);
+  initBookshelf();
+  initReader();
+  initTheme();
+  initSettings();
+  initKeyboard();
+  renderBookshelf();
 }
 
 document.addEventListener("DOMContentLoaded", init);
