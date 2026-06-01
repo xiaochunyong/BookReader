@@ -44,6 +44,7 @@ let settings = {
   lineHeight: 1.8,
   scrollSpeed: 600,
   sidebarWidth: 240,
+  readMode: "chapter",
 };
 
 async function loadBooks() {
@@ -222,6 +223,7 @@ async function openBook(index) {
 
   document.getElementById("bookshelf").style.display = "none";
   document.getElementById("reader").style.display = "flex";
+  document.getElementById("bookName").textContent = currentBook.name;
 
   renderTOC();
   goToChapter(currentChapterIdx);
@@ -442,31 +444,76 @@ function renderTOC() {
 /* === 内容渲染 === */
 function renderContent() {
   const area = document.getElementById("contentArea");
-  const entry = currentBook.toc[currentChapterIdx];
-  if (!entry) return;
-
-  const content = currentBook.content;
-  const chapterText = content.substring(
-    entry.startPos,
-    entry.startPos + (entry.length || 0),
-  );
-  const paragraphs = chapterText.split(/\r?\n/).filter((p) => p.trim());
-
   const fontSize = settings.fontSize;
   const lineHeight = settings.lineHeight;
 
-  area.innerHTML =
-    `<div class="content-page" style="--font-size:${fontSize}px;--line-height:${lineHeight}">` +
-    paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join("") +
-    "</div>";
-
-  area.scrollTop = 0;
-  updatePageInfo();
+  if (settings.readMode === "full") {
+    const chapters = currentBook.toc.filter((t) => t.type === "chapter");
+    let html =
+      '<div class="content-page" style="--font-size:' +
+      fontSize +
+      "px;--line-height:" +
+      lineHeight +
+      '">';
+    for (const entry of chapters) {
+      const chapterText = currentBook.content.substring(
+        entry.startPos,
+        entry.startPos + (entry.length || 0),
+      );
+      const paragraphs = chapterText.split(/\r?\n/).filter((p) => p.trim());
+      let idx = 0;
+      for (const t of currentBook.toc) {
+        if (t === entry) break;
+        idx++;
+      }
+      html +=
+        '<div class="chapter-anchor" id="ch-' +
+        idx +
+        '">' +
+        '<h2 class="chapter-heading">' +
+        escapeHtml(entry.title) +
+        "</h2>" +
+        paragraphs.map((p) => "<p>" + escapeHtml(p) + "</p>").join("") +
+        "</div>";
+    }
+    html += "</div>";
+    area.innerHTML = html;
+    updatePageInfo();
+  } else {
+    const entry = currentBook.toc[currentChapterIdx];
+    if (!entry) return;
+    const chapterText = currentBook.content.substring(
+      entry.startPos,
+      entry.startPos + (entry.length || 0),
+    );
+    const paragraphs = chapterText.split(/\r?\n/).filter((p) => p.trim());
+    area.innerHTML =
+      '<div class="content-page" style="--font-size:' +
+      fontSize +
+      "px;--line-height:" +
+      lineHeight +
+      '">' +
+      paragraphs.map((p) => "<p>" + escapeHtml(p) + "</p>").join("") +
+      "</div>";
+    area.scrollTop = 0;
+    updatePageInfo();
+  }
 }
 
 function updatePageInfo() {
   const entry = currentBook.toc[currentChapterIdx];
   document.getElementById("pageInfo").textContent = entry ? entry.title : "";
+}
+
+function scrollToChapter(idx) {
+  const el = document.getElementById("ch-" + idx);
+  if (el) {
+    el.scrollIntoView({ block: "start", behavior: "smooth" });
+    currentChapterIdx = idx;
+    updatePageInfo();
+    renderTOC();
+    updateHash();
+  }
 }
 
 /* === 全文检索 === */
@@ -660,12 +707,13 @@ function isBookmarked(idx) {
 function goToChapter(idx) {
   currentChapterIdx = ensureChapterIdx(idx);
   currentPage = 0;
-  const entry = currentBook.toc[currentChapterIdx];
-  document.getElementById("bookName").textContent =
-    currentBook.name + (entry ? " - " + entry.title : "");
-  renderTOC();
-  renderContent();
-  updateHash();
+  if (settings.readMode === "full") {
+    scrollToChapter(currentChapterIdx);
+  } else {
+    renderTOC();
+    renderContent();
+    updateHash();
+  }
 }
 
 function nextChapter() {
@@ -674,7 +722,9 @@ function nextChapter() {
     .filter((i) => i !== -1);
   const pos = allChapterIndices.indexOf(currentChapterIdx);
   if (pos < allChapterIndices.length - 1) {
-    goToChapter(allChapterIndices[pos + 1]);
+    const nextIdx = allChapterIndices[pos + 1];
+    if (settings.readMode === "full") scrollToChapter(nextIdx);
+    else goToChapter(nextIdx);
   }
 }
 
@@ -684,7 +734,9 @@ function prevChapter() {
     .filter((i) => i !== -1);
   const pos = allChapterIndices.indexOf(currentChapterIdx);
   if (pos > 0) {
-    goToChapter(allChapterIndices[pos - 1]);
+    const prevIdx = allChapterIndices[pos - 1];
+    if (settings.readMode === "full") scrollToChapter(prevIdx);
+    else goToChapter(prevIdx);
   }
 }
 
@@ -722,6 +774,50 @@ function initReader() {
 
   // 侧边栏拖拽
   initSidebarResize();
+
+  // 阅读模式切换
+  const modeBtn = document.getElementById("modeToggleBtn");
+  modeBtn.textContent = settings.readMode === "full" ? "章节" : "全文";
+  modeBtn.addEventListener("click", () => {
+    settings.readMode = settings.readMode === "chapter" ? "full" : "chapter";
+    modeBtn.textContent = settings.readMode === "full" ? "章节" : "全文";
+    saveSettings();
+    if (currentBook) {
+      renderTOC();
+      renderContent();
+    }
+  });
+
+  // 全文模式滚动时更新当前章节
+  let scrollTick;
+  document.getElementById("contentArea").addEventListener("scroll", () => {
+    if (settings.readMode !== "full" || !currentBook) return;
+    if (scrollTick) return;
+    scrollTick = requestAnimationFrame(() => {
+      scrollTick = null;
+      const chapters = currentBook.toc.filter((t) => t.type === "chapter");
+      const scrollTop = document.getElementById("contentArea").scrollTop + 50;
+      let found = currentChapterIdx;
+      for (let i = chapters.length - 1; i >= 0; i--) {
+        let idx = 0;
+        for (const t of currentBook.toc) {
+          if (t === chapters[i]) break;
+          idx++;
+        }
+        const el = document.getElementById("ch-" + idx);
+        if (el && el.offsetTop <= scrollTop) {
+          found = idx;
+          break;
+        }
+      }
+      if (found !== currentChapterIdx) {
+        currentChapterIdx = found;
+        updatePageInfo();
+        renderTOC();
+        updateHash();
+      }
+    });
+  });
 
   window.addEventListener("resize", () => {
     if (currentBook) {
