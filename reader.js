@@ -225,7 +225,6 @@ async function openBook(index) {
 
   renderTOC();
   goToChapter(currentChapterIdx);
-  updateHash();
 }
 
 /* === 返回书架 === */
@@ -974,16 +973,13 @@ function initKeyboard() {
 }
 
 /* === 路由 === */
+let _routing = false;
+
 function updateHash() {
-  if (currentBook) {
-    const url =
-      location.pathname +
-      location.search +
-      "#/read/" +
-      currentBook.id +
-      "/" +
-      currentChapterIdx;
-    history.replaceState(null, "", url);
+  if (_routing || !currentBook) return;
+  const newHash = "#/read/" + currentBook.id + "/" + currentChapterIdx;
+  if (location.hash !== newHash) {
+    history.replaceState(null, "", newHash);
   }
 }
 
@@ -998,15 +994,12 @@ async function restoreFromHash() {
   if (!m) return false;
   const bookId = parseFloat(m[1]);
   const chapterIdx = parseInt(m[2]);
-
-  if (currentBook && currentBook.id === bookId && currentChapterIdx === chapterIdx) {
-    return true;
-  }
-
   const idx = books.findIndex((b) => b.id === bookId);
   if (idx < 0) return false;
+  _routing = true;
   await openBook(idx);
   if (chapterIdx > 0) goToChapter(chapterIdx);
+  _routing = false;
   return true;
 }
 
@@ -1023,13 +1016,11 @@ async function init() {
   initSettings();
   initKeyboard();
 
-  // 尝试从 hash 恢复阅读状态
   const restored = await restoreFromHash();
   if (!restored) {
     renderBookshelf();
   }
 
-  // 监听浏览器前进后退
   window.addEventListener("hashchange", async () => {
     if (!location.hash) {
       if (currentBook) await backToShelf();
