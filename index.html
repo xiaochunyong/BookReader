@@ -1,126 +1,107 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>本地小说阅读器</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body data-theme="day">
-    <!-- 书架页面 -->
-    <div id="bookshelf">
-      <div class="shelf-header">
-        <h1>我的书架</h1>
-        <div class="shelf-actions">
-          <div class="theme-switcher">
-            <button class="icon-btn" id="shelfThemeBtn" title="切换主题">
-              主题
-            </button>
-            <div class="theme-dropdown" id="shelfThemeDropdown">
-              <button data-theme="day">日间模式</button>
-              <button data-theme="night">夜间模式</button>
-              <button data-theme="eye">护眼模式</button>
-              <button data-theme="parchment">羊皮纸</button>
-            </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>本地小说阅读器</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body data-theme="day">
+  <!-- 书架页面 -->
+  <div id="bookshelf">
+    <div class="shelf-header">
+      <h1>我的书架</h1>
+      <div class="shelf-actions">
+        <div class="theme-switcher">
+          <button class="icon-btn" id="shelfThemeBtn" title="切换主题">主题</button>
+          <div class="theme-dropdown" id="shelfThemeDropdown">
+            <button data-theme="day">日间模式</button>
+            <button data-theme="night">夜间模式</button>
+            <button data-theme="eye">护眼模式</button>
+            <button data-theme="parchment">羊皮纸</button>
           </div>
         </div>
       </div>
-      <button class="import-btn" id="importBtn">导入新书</button>
-      <input
-        type="file"
-        id="fileInput"
-        accept=".txt"
-        multiple
-        style="display: none"
-      />
-      <div class="book-grid" id="bookGrid"></div>
-      <div class="empty-hint" id="emptyHint">还没有书，点击上方按钮导入</div>
     </div>
+    <button class="import-btn" id="importBtn">导入新书</button>
+    <input type="file" id="fileInput" accept=".txt" multiple style="display:none" />
+    <div class="book-grid" id="bookGrid"></div>
+    <div class="empty-hint" id="emptyHint">还没有书，点击上方按钮导入</div>
+  </div>
 
-    <!-- 阅读器页面 -->
-    <div id="reader" style="display: none">
-      <div class="reader-header">
-        <button class="back-btn" id="backBtn">← 返回书架</button>
-        <span id="bookName">书名</span>
-        <div class="header-actions">
-          <div class="theme-switcher">
-            <button class="icon-btn" id="readerThemeBtn" title="切换主题">
-              主题
-            </button>
-            <div class="theme-dropdown" id="readerThemeDropdown">
-              <button data-theme="day">日间模式</button>
-              <button data-theme="night">夜间模式</button>
-              <button data-theme="eye">护眼模式</button>
-              <button data-theme="parchment">羊皮纸</button>
-            </div>
-          </div>
-          <button class="icon-btn" id="modeToggleBtn" title="切换阅读模式">全文</button>
-          <button class="icon-btn" id="searchBtn" title="搜索">搜索</button>
-          <button class="icon-btn" id="bookmarkBtn" title="书签">书签</button>
-          <button class="icon-btn" id="settingsBtn" title="设置">设置</button>
-          <button class="icon-btn" id="tocToggleBtn" title="目录">目录</button>
-        </div>
+  <!-- 阅读器页面 -->
+  <div id="reader" style="display:none">
+    <div class="reader-header">
+      <button class="back-btn" id="backBtn">← 返回书架</button>
+      <span id="bookName">书名</span>
+      <div class="header-actions">
+        <button class="icon-btn" id="searchBtn" title="搜索">搜索</button>
+        <button class="icon-btn" id="settingsBtn" title="设置">设置</button>
       </div>
-      <!-- 搜索面板 -->
-      <div class="search-panel" id="searchPanel" style="display: none">
-        <div class="search-bar">
-          <input type="text" id="searchInput" placeholder="输入关键词搜索..." />
-          <span id="searchCount"></span>
-          <button id="searchPrevBtn">▲</button>
-          <button id="searchNextBtn">▼</button>
-          <button id="searchCloseBtn">×</button>
-        </div>
-        <div class="search-results" id="searchResults"></div>
+    </div>
+    <!-- 搜索面板 -->
+    <div class="search-panel" id="searchPanel" style="display:none">
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="输入关键词搜索..." />
+        <span id="searchCount"></span>
+        <button id="searchPrevBtn">▲</button>
+        <button id="searchNextBtn">▼</button>
+        <button id="searchCloseBtn">×</button>
       </div>
-      <div class="reader-body">
-        <aside class="toc-sidebar" id="tocSidebar">
+      <div class="search-results" id="searchResults"></div>
+    </div>
+    <div class="reader-body">
+      <aside class="toc-sidebar" id="tocSidebar">
+        <div class="sidebar-tabs">
+          <button class="sidebar-tab active" data-tab="toc">目录</button>
+          <button class="sidebar-tab" data-tab="bookmarks">书签</button>
+        </div>
+        <div class="sidebar-content" id="sidebarTOC">
           <div class="toc-list" id="tocList"></div>
-          <div class="sidebar-resize-handle" id="sidebarResizeHandle"></div>
-        </aside>
-        <div class="content-area" id="contentArea"></div>
-      </div>
-      <div class="reader-footer">
-        <button id="prevChapterBtn">◀ 上一章</button>
-        <span id="pageInfo">第 1 页</span>
-        <button id="nextChapterBtn">下一章 ▶</button>
-      </div>
-
-      <!-- 设置面板 -->
-      <div class="settings-panel" id="settingsPanel" style="display: none">
-        <h3>阅读设置</h3>
-        <label>字体大小</label>
-        <input
-          type="range"
-          id="fontSizeSlider"
-          min="14"
-          max="32"
-          value="20"
-          step="2"
-        />
-        <span id="fontSizeLabel">20px</span>
-        <label>行间距</label>
-        <input
-          type="range"
-          id="lineHeightSlider"
-          min="1.2"
-          max="2.8"
-          value="1.8"
-          step="0.2"
-        />
-        <span id="lineHeightLabel">1.8</span>
-        <label>滚动距离</label>
-        <input
-          type="range"
-          id="scrollSpeedSlider"
-          min="100"
-          max="1200"
-          value="600"
-          step="50"
-        />
-        <span id="scrollSpeedLabel">600</span>
+        </div>
+        <div class="sidebar-content" id="sidebarBookmarks" style="display:none">
+          <div class="bookmark-list" id="bookmarkList"></div>
+        </div>
+        <div class="sidebar-resize-handle" id="sidebarResizeHandle"></div>
+      </aside>
+      <div class="content-area" id="contentArea">
+        <button class="content-corner-btn left" id="tocToggleBtn" title="目录">☰</button>
+        <button class="content-corner-btn right" id="bookmarkBtn" title="添加书签">☆</button>
       </div>
     </div>
+    <div class="reader-footer">
+      <button id="prevChapterBtn">◀ 上一章</button>
+      <span id="pageInfo">第 1 页</span>
+      <button id="nextChapterBtn">下一章 ▶</button>
+    </div>
 
-    <script src="reader.js"></script>
-  </body>
+    <!-- 设置面板 -->
+    <div class="settings-panel" id="settingsPanel" style="display:none">
+      <h3>阅读设置</h3>
+      <label>主题</label>
+      <div class="settings-theme-btns">
+        <button data-theme="day">日间</button>
+        <button data-theme="night">夜间</button>
+        <button data-theme="eye">护眼</button>
+        <button data-theme="parchment">羊皮</button>
+      </div>
+      <label>阅读模式</label>
+      <div class="settings-mode-btns">
+        <button data-mode="chapter">章节</button>
+        <button data-mode="full">全文</button>
+      </div>
+      <label>字体大小</label>
+      <input type="range" id="fontSizeSlider" min="14" max="32" value="20" step="2" />
+      <span id="fontSizeLabel">20px</span>
+      <label>行间距</label>
+      <input type="range" id="lineHeightSlider" min="1.2" max="2.8" value="1.8" step="0.2" />
+      <span id="lineHeightLabel">1.8</span>
+      <label>滚动距离</label>
+      <input type="range" id="scrollSpeedSlider" min="100" max="1200" value="600" step="50" />
+      <span id="scrollSpeedLabel">600</span>
+    </div>
+  </div>
+
+  <script src="reader.js"></script>
+</body>
 </html>

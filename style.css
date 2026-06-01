@@ -142,7 +142,9 @@ body {
   gap: 2px;
 }
 
-.book-chapter-count { color: var(--text-secondary); }
+.book-chapter-count {
+  color: var(--text-secondary);
+}
 
 .book-read-progress {
   color: var(--accent);
@@ -248,17 +250,49 @@ body {
   width: 240px;
   background: var(--sidebar-bg);
   border-right: 1px solid var(--border);
-  overflow-y: auto;
   flex-shrink: 0;
-  transition: padding 0.2s;
-  padding: 12px;
+  display: flex;
+  flex-direction: column;
 }
 
 .toc-sidebar.collapsed {
   width: 0;
-  padding: 0;
+  min-width: 0;
   border: none;
   overflow: hidden;
+}
+
+/* 侧边栏 Tab */
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.sidebar-tab {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+  border-bottom: 2px solid transparent;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.sidebar-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px 12px;
 }
 
 .toc-volume {
@@ -631,4 +665,84 @@ body {
   --border: #d4c4a8;
   --hover-bg: rgba(0, 0, 0, 0.05);
   --dropdown-bg: #f5e6c8;
+}
+
+/* === 内容角落按钮 === */
+.content-area {
+  position: relative;
+}
+
+.content-corner-btn {
+  position: absolute;
+  z-index: 50;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(128,128,128,0.08);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s, color 0.2s, background 0.2s;
+  opacity: 0.4;
+}
+
+.content-corner-btn:hover { opacity: 1; background: rgba(128,128,128,0.15); }
+
+.content-corner-btn.left { left: 12px; top: 12px; }
+
+.content-corner-btn.right { right: 12px; top: 12px; }
+
+.content-corner-btn.bookmarked { color: #e6a817; opacity: 0.85; }
+
+/* === 书签列表 === */
+.bookmark-item {
+  padding: 8px 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s;
+}
+
+.bookmark-item:hover { background: var(--hover-bg); }
+
+.bookmark-item .bm-chapter { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.bookmark-item .bm-remove { color: var(--text-secondary); font-size: 12px; background: none; border: none; cursor: pointer; }
+
+.bookmark-item .bm-remove:hover { color: #e74c3c; }
+
+.bookmark-empty { text-align: center; color: var(--text-secondary); font-size: 13px; margin-top: 40px; }
+
+/* === 设置面板按钮组 === */
+.settings-theme-btns,
+.settings-mode-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.settings-theme-btns button,
+.settings-mode-btns button {
+  flex: 1;
+  padding: 6px 0;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.settings-theme-btns button.active,
+.settings-mode-btns button.active {
+  color: var(--accent);
+  border-color: var(--accent);
 }

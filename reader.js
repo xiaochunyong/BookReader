@@ -110,26 +110,35 @@ function renderBookshelf() {
 
   hint.style.display = "none";
   grid.innerHTML = books
-    .map(
-      (book, i) => {
-        const chapterCount = book.toc ? book.toc.filter((t) => t.type === "chapter").length : 0;
-        const progress = book.currentChapter !== undefined && chapterCount > 0
+    .map((book, i) => {
+      const chapterCount = book.toc
+        ? book.toc.filter((t) => t.type === "chapter").length
+        : 0;
+      const progress =
+        book.currentChapter !== undefined && chapterCount > 0
           ? Math.round((book.currentChapter / chapterCount) * 100)
           : 0;
-        return (
-          '<div class="book-card" data-index="' + i + '">' +
-          '<button class="delete-btn" data-index="' + i + '">&times;</button>' +
-          '<div class="book-title">' + escapeHtml(book.name) + "</div>" +
-          '<div class="book-progress">' +
-          '<span class="book-chapter-count">共 ' + chapterCount + " 章</span>" +
-          (book.currentChapter !== undefined
-            ? '<span class="book-read-progress">已读 ' + progress + "%</span>"
-            : '<span class="book-read-progress" style="opacity:0.5">未读</span>') +
-          "</div>" +
-          "</div>"
-        );
-      },
-    )
+      return (
+        '<div class="book-card" data-index="' +
+        i +
+        '">' +
+        '<button class="delete-btn" data-index="' +
+        i +
+        '">&times;</button>' +
+        '<div class="book-title">' +
+        escapeHtml(book.name) +
+        "</div>" +
+        '<div class="book-progress">' +
+        '<span class="book-chapter-count">共 ' +
+        chapterCount +
+        " 章</span>" +
+        (book.currentChapter !== undefined
+          ? '<span class="book-read-progress">已读 ' + progress + "%</span>"
+          : '<span class="book-read-progress" style="opacity:0.5">未读</span>') +
+        "</div>" +
+        "</div>"
+      );
+    })
     .join("");
 }
 
@@ -235,6 +244,7 @@ async function openBook(index) {
   document.getElementById("bookName").textContent = currentBook.name;
 
   renderTOC();
+  renderBookmarks();
   goToChapter(currentChapterIdx);
 }
 
@@ -463,6 +473,30 @@ function renderTOC() {
   // 滚动到当前章节可见
   const active = list.querySelector(".toc-chapter.active");
   if (active) active.scrollIntoView({ block: "nearest" });
+}
+
+function renderBookmarks() {
+  const list = document.getElementById("bookmarkList");
+  if (!currentBook || !currentBook.bookmarks || Object.keys(currentBook.bookmarks).length === 0) {
+    list.innerHTML = '<div class="bookmark-empty">暂无书签</div>';
+    return;
+  }
+  const entries = Object.entries(currentBook.bookmarks).sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+  list.innerHTML = entries.map(([idx]) => {
+    const chapter = currentBook.toc[parseInt(idx)];
+    return '<div class="bookmark-item" data-idx="' + idx + '">' +
+      '<span class="bm-chapter">' + escapeHtml(chapter ? chapter.title : "未知章节") + '</span>' +
+      '<button class="bm-remove" data-idx="' + idx + '">×</button>' +
+      '</div>';
+  }).join("");
+}
+
+function updateBookmarkBtn() {
+  const btn = document.getElementById("bookmarkBtn");
+  const isBm = currentBook && currentBook.bookmarks && currentBook.bookmarks[String(currentChapterIdx)];
+  btn.textContent = isBm ? "★" : "☆";
+  if (isBm) btn.classList.add("bookmarked");
+  else btn.classList.remove("bookmarked");
 }
 
 /* === 内容渲染 === */
@@ -712,13 +746,14 @@ function toggleBookmark() {
     currentBook.bookmarks[key] = { time: Date.now() };
   }
 
-  // 更新元数据
   const metaIdx = books.findIndex((b) => b.id === currentBook.id);
   if (metaIdx >= 0) {
     books[metaIdx].bookmarks = currentBook.bookmarks;
   }
   saveBookMeta(currentBook);
   renderTOC();
+  renderBookmarks();
+  updateBookmarkBtn();
 }
 
 function isBookmarked(idx) {
@@ -794,6 +829,38 @@ function initReader() {
     sidebar.style.width = collapsed ? "0" : settings.sidebarWidth + "px";
   });
 
+  // 侧边栏 Tab 切换
+  document.querySelectorAll(".sidebar-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".sidebar-tab").forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      var target = tab.dataset.tab;
+      document.getElementById("sidebarTOC").style.display = target === "toc" ? "block" : "none";
+      document.getElementById("sidebarBookmarks").style.display = target === "bookmarks" ? "block" : "none";
+    });
+  });
+
+  // 书签列表点击
+  document.getElementById("bookmarkList").addEventListener("click", (e) => {
+    var removeBtn = e.target.closest(".bm-remove");
+    var item = e.target.closest(".bookmark-item");
+    if (removeBtn) {
+      e.stopPropagation();
+      var idx = parseInt(removeBtn.dataset.idx);
+      if (currentBook && currentBook.bookmarks) {
+        delete currentBook.bookmarks[String(idx)];
+        saveBookMeta(currentBook);
+        renderBookmarks();
+        renderTOC();
+        updateBookmarkBtn();
+      }
+      return;
+    }
+    if (item) {
+      goToChapter(parseInt(item.dataset.idx));
+    }
+  });
+
   // 搜索
   initSearch();
 
@@ -805,18 +872,7 @@ function initReader() {
   // 侧边栏拖拽
   initSidebarResize();
 
-  // 阅读模式切换
-  const modeBtn = document.getElementById("modeToggleBtn");
-  modeBtn.textContent = settings.readMode === "full" ? "章节" : "全文";
-  modeBtn.addEventListener("click", () => {
-    settings.readMode = settings.readMode === "chapter" ? "full" : "chapter";
-    modeBtn.textContent = settings.readMode === "full" ? "章节" : "全文";
-    saveSettings();
-    if (currentBook) {
-      renderTOC();
-      renderContent();
-    }
-  });
+
 
   // 全文模式滚动时更新当前章节
   let scrollTick;
@@ -966,10 +1022,6 @@ function initTheme() {
       }
     });
 
-  // 阅读器主题按钮
-  document.getElementById("readerThemeBtn").addEventListener("click", () => {
-    document.getElementById("readerThemeDropdown").classList.toggle("show");
-  });
   document
     .getElementById("readerThemeDropdown")
     .addEventListener("click", (e) => {
@@ -1024,6 +1076,28 @@ function initSettings() {
     settings.scrollSpeed = parseInt(scrollSpeedSlider.value);
     scrollSpeedLabel.textContent = settings.scrollSpeed;
     saveSettings();
+  });
+
+  // 主题切换按钮
+  document.querySelectorAll(".settings-theme-btns button").forEach((btn) => {
+    if (btn.dataset.theme === settings.theme) btn.classList.add("active");
+    btn.addEventListener("click", () => {
+      setTheme(btn.dataset.theme);
+      document.querySelectorAll(".settings-theme-btns button").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+    });
+  });
+
+  // 阅读模式切换按钮
+  document.querySelectorAll(".settings-mode-btns button").forEach((btn) => {
+    if (btn.dataset.mode === settings.readMode) btn.classList.add("active");
+    btn.addEventListener("click", () => {
+      settings.readMode = btn.dataset.mode;
+      document.querySelectorAll(".settings-mode-btns button").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      saveSettings();
+      if (currentBook) { renderTOC(); renderContent(); }
+    });
   });
 
   document.getElementById("settingsBtn").addEventListener("click", () => {
