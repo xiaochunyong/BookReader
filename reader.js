@@ -292,39 +292,53 @@ const CN_NUM = {
   十: 10,
   百: 100,
   千: 1000,
+  零: 0,
+  〇: 0,
 };
 
 function cnToArabic(str) {
-  let result = 0;
-  let current = 0;
+  // 纯阿拉伯数字
+  if (/^\d+$/.test(str)) return parseInt(str);
+
+  let result = 0,
+    section = 0,
+    digit = 0;
+
   for (const ch of str) {
     const v = CN_NUM[ch];
-    if (v === 100 || v === 1000) {
-      current = (current || 1) * v;
-      result += current;
-      current = 0;
-    } else if (v === 10) {
-      current = (current || 1) * 10;
-      result += current;
-      current = 0;
-    } else if (v !== undefined) {
-      current = v;
+    if (v === undefined) continue; // 跳过不识别的字符
+    if (v >= 10) {
+      // 十/百/千
+      digit = digit || 1;
+      section += digit * v;
+      digit = 0;
     } else {
-      // 阿拉伯数字字符
-      if (ch >= "0" && ch <= "9") {
-        current = current * 10 + parseInt(ch);
-      }
+      // 0-9
+      digit = v;
     }
   }
-  result += current;
+  // 检查是否已累积 section（如"一千二百"），有则加上最后一位
+  if (section > 0) {
+    result = section + digit;
+  } else {
+    // 纯数字序列（如"一二" → 12），按位拼接
+    let num = 0;
+    for (const ch of str) {
+      const v = CN_NUM[ch];
+      if (v === undefined || v >= 10) continue;
+      num = num * 10 + v;
+    }
+    return num;
+  }
   return result;
 }
 
 /* === TOC 解析 === */
 function parseTOC(content) {
-  const VOLUME_RE = /^[\s]*第[\s]*([一二三四五六七八九十百千\d]+)[\s]*[卷册]/;
+  const VOLUME_RE =
+    /^[\s]*第[\s]*([一二三四五六七八九十百千零〇\d]+)[\s]*[卷册]/;
   const CHAPTER_RE =
-    /^[\s]*第[\s]*([一二三四五六七八九十百千\d]+)[\s]*[章回节]/;
+    /^[\s]*第[\s]*([一二三四五六七八九十百千零〇\d]+)[\s]*[章回节]/;
 
   const lines = content.split(/\r?\n/);
   const toc = [];
@@ -365,7 +379,7 @@ function parseTOC(content) {
 
     // 再尝试章节匹配
     const chMatch = trimmed.match(CHAPTER_RE);
-    if (chMatch && lineLen <= 50) {
+    if (chMatch && lineLen <= 80) {
       const num = cnToArabic(chMatch[1]);
       // 关闭上一个条目
       if (toc.length > 0 && toc[toc.length - 1].length === undefined) {
