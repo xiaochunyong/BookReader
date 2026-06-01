@@ -225,6 +225,7 @@ async function openBook(index) {
 
   renderTOC();
   goToChapter(currentChapterIdx);
+  updateHash();
 }
 
 /* === 返回书架 === */
@@ -245,6 +246,7 @@ async function backToShelf() {
       books[metaIdx].currentChapter = currentBook.currentChapter;
       books[metaIdx].currentPage = currentBook.currentPage;
     }
+    clearHash();
     renderBookshelf();
   }
   document.getElementById("bookshelf").style.display = "block";
@@ -664,6 +666,7 @@ function goToChapter(idx) {
     currentBook.name + (entry ? " - " + entry.title : "");
   renderTOC();
   renderContent();
+  updateHash();
 }
 
 function nextChapter() {
@@ -970,6 +973,31 @@ function initKeyboard() {
   });
 }
 
+/* === 路由 === */
+function updateHash() {
+  if (currentBook) {
+    location.hash = "#/read/" + currentBook.id + "/" + currentChapterIdx;
+  }
+}
+
+function clearHash() {
+  if (location.hash) {
+    history.replaceState(null, "", location.pathname + location.search);
+  }
+}
+
+async function restoreFromHash() {
+  const m = location.hash.match(/^#\/read\/([^/]+)\/(\d+)$/);
+  if (!m) return false;
+  const bookId = parseFloat(m[1]);
+  const chapterIdx = parseInt(m[2]);
+  const idx = books.findIndex((b) => b.id === bookId);
+  if (idx < 0) return false;
+  await openBook(idx);
+  if (chapterIdx > 0) goToChapter(chapterIdx);
+  return true;
+}
+
 /* === 初始化 === */
 async function init() {
   await loadBooks();
@@ -982,7 +1010,22 @@ async function init() {
   initTheme();
   initSettings();
   initKeyboard();
-  renderBookshelf();
+
+  // 尝试从 hash 恢复阅读状态
+  const restored = await restoreFromHash();
+  if (!restored) {
+    renderBookshelf();
+  }
+
+  // 监听浏览器前进后退
+  window.addEventListener("hashchange", async () => {
+    if (!location.hash) {
+      if (currentBook) await backToShelf();
+      renderBookshelf();
+    } else {
+      await restoreFromHash();
+    }
+  });
 }
 
 document.addEventListener("DOMContentLoaded", init);
