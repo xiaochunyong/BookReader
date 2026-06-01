@@ -266,7 +266,9 @@ body {
   padding-bottom: 10px;
 }
 
-.chapter-heading:first-child { margin-top: 0; }
+.chapter-heading:first-child {
+  margin-top: 0;
+}
 
 /* === 搜索面板 === */
 .search-panel {
@@ -432,7 +434,7 @@ body {
   position: absolute;
   right: 0;
   top: calc(100% + 8px);
-  background: var(--dropdown-bg);
+  background: #fff;
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   overflow: hidden;
@@ -451,14 +453,14 @@ body {
   padding: 10px 16px;
   border: none;
   background: none;
-  color: var(--text);
+  color: #333;
   cursor: pointer;
   font-size: 14px;
   text-align: left;
 }
 
 .theme-dropdown button:hover {
-  background: var(--hover-bg);
+  background: #f0f0f0;
 }
 
 /* === 设置面板 === */
