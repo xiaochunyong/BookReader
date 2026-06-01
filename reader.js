@@ -508,7 +508,7 @@ function updatePageInfo() {
 function scrollToChapter(idx) {
   const el = document.getElementById("ch-" + idx);
   if (el) {
-    el.scrollIntoView({ block: "start", behavior: "auto" });
+    el.scrollIntoView({ block: "start", behavior: "instant" });
     currentChapterIdx = idx;
     updatePageInfo();
     renderTOC();
@@ -708,6 +708,10 @@ function goToChapter(idx) {
   currentChapterIdx = ensureChapterIdx(idx);
   currentPage = 0;
   if (settings.readMode === "full") {
+    if (!document.getElementById("ch-" + currentChapterIdx)) {
+      renderTOC();
+      renderContent();
+    }
     scrollToChapter(currentChapterIdx);
   } else {
     renderTOC();
