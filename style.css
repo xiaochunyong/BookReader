@@ -791,3 +791,48 @@ body {
   flex-direction: column;
   overflow: hidden;
 }
+
+/* === 快捷键设置 === */
+.key-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.key-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.key-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.key-btn {
+  min-width: 48px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s;
+}
+
+.key-btn:hover { border-color: var(--accent); }
+
+.key-btn.key-recording {
+  border-color: var(--accent);
+  color: var(--accent);
+  animation: pulse 0.8s ease infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

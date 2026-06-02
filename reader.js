@@ -45,6 +45,14 @@ let settings = {
   scrollSpeed: 600,
   sidebarWidth: 240,
   readMode: "chapter",
+  keys: {
+    prevChapter: "ArrowLeft",
+    nextChapter: "ArrowRight",
+    scrollUp: "ArrowUp",
+    scrollDown: "ArrowDown",
+    backToShelf: "Escape",
+    toggleTheme: "t",
+  },
 };
 
 async function loadBooks() {
@@ -1135,57 +1143,125 @@ function scrollDown() {
   }
 }
 
+function initKeySettings() {
+  const container = document.getElementById("keySettings");
+  const names = [
+    ["prevChapter", "上一章"],
+    ["nextChapter", "下一章"],
+    ["scrollUp", "上滚"],
+    ["scrollDown", "下滚"],
+    ["backToShelf", "返回书架"],
+    ["toggleTheme", "切换主题"],
+  ];
+
+  function renderKeys() {
+    const k = settings.keys || {};
+    container.innerHTML = names
+      .map(([name, label]) => {
+        const key = k[name] || "?";
+        return (
+          '<div class="key-row"><span class="key-label">' +
+          label +
+          '</span><button class="key-btn" data-name="' +
+          name +
+          '">' +
+          getKeyLabel(key) +
+          "</button></div>"
+        );
+      })
+      .join("");
+  }
+  renderKeys();
+
+  container.addEventListener("click", (e) => {
+    const btn = e.target.closest(".key-btn");
+    if (!btn || btn.classList.contains("key-recording")) return;
+    const name = btn.dataset.name;
+    const orig = btn.textContent;
+    btn.textContent = "...";
+    btn.classList.add("key-recording");
+
+    const cleanup = (e2) => {
+      e2.preventDefault();
+      e2.stopPropagation();
+      const newKey = e2.key;
+      btn.classList.remove("key-recording");
+      btn.removeEventListener("keydown", cleanup);
+      btn.removeEventListener("blur", cleanup);
+      if (newKey === "Escape") {
+        btn.textContent = orig;
+        return;
+      }
+      if (!settings.keys) settings.keys = {};
+      settings.keys[name] = newKey;
+      saveSettings();
+      renderKeys();
+    };
+
+    btn.addEventListener("keydown", cleanup);
+    btn.addEventListener("blur", cleanup);
+  });
+}
+
 /* === 键盘快捷键 === */
+const KEY_LABELS = {
+  ArrowLeft: "←",
+  ArrowRight: "→",
+  ArrowUp: "↑",
+  ArrowDown: "↓",
+  Escape: "Esc",
+  " ": "空格",
+};
+
+function getKeyLabel(k) {
+  return KEY_LABELS[k] || k.length === 1 ? k.toUpperCase() : k;
+}
+
+function keyAction(name) {
+  const kfn = {
+    prevChapter,
+    nextChapter,
+    scrollUp: () =>
+      document
+        .getElementById("contentArea")
+        .scrollBy({ top: -settings.scrollSpeed, behavior: "smooth" }),
+    scrollDown: () => scrollDown(),
+    backToShelf: () => {
+      (async () => {
+        await backToShelf();
+      })();
+    },
+    toggleTheme: () => {
+      const ts = ["day", "night", "eye", "parchment"];
+      setTheme(ts[(ts.indexOf(settings.theme) + 1) % ts.length]);
+    },
+  };
+  return kfn[name];
+}
+
 function initKeyboard() {
   document.addEventListener("keydown", (e) => {
     if (!currentBook) return;
-    // 不在输入框内才响应
     if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+    // 检查是否有正在记录中的快捷键绑定
+    if (document.querySelector(".key-recording")) return;
+    if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+      e.preventDefault();
+      const p = document.getElementById("searchPanel");
+      p.style.display = "flex";
+      document.getElementById("searchInput").focus();
+      document.getElementById("searchInput").select();
+      return;
+    }
 
-    switch (e.key) {
-      case "ArrowLeft":
+    const k = settings.keys || {};
+    for (const [name, key] of Object.entries(k)) {
+      if (e.key.toLowerCase() === key.toLowerCase()) {
         e.preventDefault();
-        prevChapter();
-        break;
-      case "ArrowRight":
-        e.preventDefault();
-        nextChapter();
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        document
-          .getElementById("contentArea")
-          .scrollBy({ top: -settings.scrollSpeed, behavior: "smooth" });
-        break;
-      case "ArrowDown":
-        e.preventDefault();
-        scrollDown();
-        break;
-      case "Escape":
-        e.preventDefault();
-        (async () => {
-          await backToShelf();
-        })();
-        break;
-      case "t":
-      case "T":
-        e.preventDefault();
-        {
-          // 循环切换主题
-          const themes = ["day", "night", "eye", "parchment"];
-          const idx = themes.indexOf(settings.theme);
-          setTheme(themes[(idx + 1) % themes.length]);
-        }
-        break;
-      default:
-        if ((e.ctrlKey || e.metaKey) && e.key === "f") {
-          e.preventDefault();
-          const panel = document.getElementById("searchPanel");
-          panel.style.display = "flex";
-          document.getElementById("searchInput").focus();
-          document.getElementById("searchInput").select();
-        }
-        break;
+        const fn = keyAction(name);
+        if (fn) fn();
+        return;
+      }
     }
   });
 }
@@ -1232,6 +1308,7 @@ async function init() {
   initReader();
   initTheme();
   initSettings();
+  initKeySettings();
   initKeyboard();
 
   const restored = await restoreFromHash();
