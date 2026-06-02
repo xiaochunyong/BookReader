@@ -45,6 +45,7 @@ let settings = {
   scrollSpeed: 600,
   sidebarWidth: 240,
   readMode: "chapter",
+  contentWidth: 900,
   keys: {
     prevChapter: "ArrowLeft",
     nextChapter: "ArrowRight",
@@ -539,7 +540,9 @@ function renderContent() {
       fontSize +
       "px;--line-height:" +
       lineHeight +
-      '">';
+      ";--max-width:" +
+      settings.contentWidth +
+      'px">';
     for (const entry of chapters) {
       const chapterText = currentBook.content.substring(
         entry.startPos,
@@ -577,7 +580,9 @@ function renderContent() {
       fontSize +
       "px;--line-height:" +
       lineHeight +
-      '">' +
+      ";--max-width:" +
+      settings.contentWidth +
+      'px">' +
       paragraphs.map((p) => "<p>" + escapeHtml(p) + "</p>").join("") +
       "</div>";
     area.scrollTop = 0;
@@ -1095,6 +1100,18 @@ function initSettings() {
     settings.scrollSpeed = parseInt(scrollSpeedSlider.value);
     scrollSpeedLabel.textContent = settings.scrollSpeed;
     saveSettings();
+  });
+
+  // 正文宽度
+  const cwSlider = document.getElementById("contentWidthSlider");
+  const cwLabel = document.getElementById("contentWidthLabel");
+  cwSlider.value = settings.contentWidth;
+  cwLabel.textContent = settings.contentWidth + "px";
+  cwSlider.addEventListener("input", () => {
+    settings.contentWidth = parseInt(cwSlider.value);
+    cwLabel.textContent = settings.contentWidth + "px";
+    saveSettings();
+    if (currentBook) renderContent();
   });
 
   // 主题切换按钮

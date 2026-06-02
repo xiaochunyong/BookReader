@@ -338,7 +338,7 @@ body {
   line-height: var(--line-height);
   font-size: var(--font-size);
   color: var(--text);
-  max-width: 900px;
+  max-width: var(--max-width);
   margin: 0 auto;
   animation: chapterIn 0.2s ease;
 }
