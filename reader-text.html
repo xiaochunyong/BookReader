@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8" /><title>章节内容</title></head>
+<body><pre id="content">加载中...</pre>
+<script>
+const DB_NAME = "HtmlReaderDB";
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbPromise(req) {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+(async () => {
+  const params = new URLSearchParams(location.search);
+  const bookId = parseFloat(params.get("book"));
+  const chapterIdx = parseInt(params.get("ch")) || 0;
+
+  if (!bookId) {
+    document.getElementById("content").textContent = "缺少参数: ?book=<id>&ch=<idx>";
+    return;
+  }
+
+  const db = await openDB();
+  const meta = await idbPromise(db.transaction("books","readonly").objectStore("books").get(bookId));
+  if (!meta) {
+    document.getElementById("content").textContent = "未找到书籍: " + bookId;
+    return;
+  }
+
+  const record = await idbPromise(db.transaction("content","readonly").objectStore("content").get(bookId));
+  const content = record ? record.text : "";
+  const chapters = meta.toc.filter(t => t.type === "chapter");
+  const allChapterIndices = meta.toc.map((t, i) => t.type === "chapter" ? i : -1).filter(i => i !== -1);
+  const idx = allChapterIndices[chapterIdx] || allChapterIndices[0] || 0;
+  const entry = meta.toc[idx];
+  if (!entry) {
+    document.getElementById("content").textContent = "章节不存在";
+    return;
+  }
+
+  const text = content.substring(entry.startPos, entry.startPos + (entry.length || 0));
+  document.title = meta.name + " - " + entry.title;
+  document.getElementById("content").textContent = text;
+})();
+</script>
+</body>
+</html>
