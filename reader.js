@@ -500,18 +500,12 @@ function renderBookmarks() {
   list.innerHTML = entries
     .map(([idx]) => {
       const chapter = currentBook.toc[parseInt(idx)];
-      return (
-        '<div class="bookmark-item" data-idx="' +
-        idx +
-        '">' +
-        '<span class="bm-chapter">' +
-        escapeHtml(chapter ? chapter.title : "未知章节") +
-        "</span>" +
-        '<button class="bm-remove" data-idx="' +
-        idx +
-        '">×</button>' +
-        "</div>"
-      );
+      return `
+        <div class="bookmark-item" data-idx="${idx}">
+          <span class="bm-chapter">${escapeHtml(chapter ? chapter.title : "未知章节")}</span>
+          <button class="bm-remove" data-idx="${idx}">×</button>
+        </div>
+        `;
     })
     .join("");
 }
@@ -535,14 +529,7 @@ function renderContent() {
 
   if (settings.readMode === "full") {
     const chapters = currentBook.toc.filter((t) => t.type === "chapter");
-    let html =
-      '<div class="content-page" style="--font-size:' +
-      fontSize +
-      "px;--line-height:" +
-      lineHeight +
-      ";--max-width:" +
-      settings.contentWidth +
-      'px">';
+    let html = `<div class="content-page" style="--font-size: ${fontSize}px; --line-height: ${lineHeight}; --max-width: ${settings.contentWidth}px">`;
     for (const entry of chapters) {
       const chapterText = currentBook.content.substring(
         entry.startPos,
@@ -554,37 +541,32 @@ function renderContent() {
         if (t === entry) break;
         idx++;
       }
-      html +=
-        '<div class="chapter-anchor" id="ch-' +
-        idx +
-        '">' +
-        '<h2 class="chapter-heading">' +
-        escapeHtml(entry.title) +
-        "</h2>" +
-        paragraphs.map((p) => "<p>" + escapeHtml(p) + "</p>").join("") +
-        "</div>";
+      html += `
+        <div class="chapter-anchor" id="ch-${idx}">
+          <h2 class="chapter-heading">
+          ${escapeHtml(entry.title)}
+          </h2>
+          ${paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join("")}
+        </div>
+        `;
     }
     html += "</div>";
     area.innerHTML = html;
     updatePageInfo();
   } else {
-    const entry = currentBook.toc[currentChapterIdx];
+    const entry = currentBook.toc.find((c) => c.index == currentChapterIdx);
+    // console.log(entry, currentChapterIdx, entry.index == currentChapterIdx);
     if (!entry) return;
     const chapterText = currentBook.content.substring(
       entry.startPos,
       entry.startPos + (entry.length || 0),
     );
     const paragraphs = chapterText.split(/\r?\n/).filter((p) => p.trim());
-    area.innerHTML =
-      '<div class="content-page" style="--font-size:' +
-      fontSize +
-      "px;--line-height:" +
-      lineHeight +
-      ";--max-width:" +
-      settings.contentWidth +
-      'px">' +
-      paragraphs.map((p) => "<p>" + escapeHtml(p) + "</p>").join("") +
-      "</div>";
+    area.innerHTML = `
+      <div class="content-page" style="--font-size: ${fontSize}px; --line-height: ${lineHeight};--max-width: ${settings.contentWidth}px">
+        ${paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join("")}
+      </div>
+      `;
     area.scrollTop = 0;
     updatePageInfo();
   }
