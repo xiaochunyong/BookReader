@@ -127,18 +127,18 @@ function renderBookshelf() {
         book.currentChapter !== undefined && chapterCount > 0
           ? Math.round((book.currentChapter / chapterCount) * 100)
           : 0;
-      return (
-        `<div class="book-card" data-index="${i}">
+      return `<div class="book-card" data-index="${i}">
                     <button class="delete-btn" data-index="${i}">&times;</button>
                     <div class="book-title">${escapeHtml(book.name)}</div>
                     <div class="book-progress">
                         <span class="book-chapter-count">共 ${chapterCount} 章</span>
-                        ${book.currentChapter !== undefined
-                          ? `<span class="book-read-progress">已读 ${progress}%</span>`
-                          : '<span class="book-read-progress" style="opacity:0.5">未读</span>'}
+                        ${
+                          book.currentChapter !== undefined
+                            ? `<span class="book-read-progress">已读 ${progress}%</span>`
+                            : '<span class="book-read-progress" style="opacity:0.5">未读</span>'
+                        }
                     </div>
-                </div>`
-      );
+                </div>`;
     })
     .join("");
 }
@@ -546,8 +546,7 @@ function renderContent() {
     area.innerHTML = html;
     updatePageInfo();
   } else {
-    const entry = currentBook.toc.find((c) => c.index == currentChapterIdx);
-    // console.log(entry, currentChapterIdx, entry.index == currentChapterIdx);
+    const entry = currentBook.toc[currentChapterIdx];
     if (!entry) return;
     const chapterText = currentBook.content.substring(
       entry.startPos,
@@ -649,12 +648,12 @@ function renderSearchResults() {
         m.chapterIdx >= 0 ? currentBook.toc[m.chapterIdx].title : "";
       const cls =
         i === currentSearchIdx ? ' style="background:var(--hover-bg)"' : "";
-      return (
-        `<div class="search-result" data-idx="${i}"${cls}>
-                    <div class="result-chapter">${escapeHtml(chapter)}</div>
-                    <div class="result-text">...${escapeHtml(m.before)}<em>${escapeHtml(m.match)}</em>${escapeHtml(m.after)}...</div>
-                </div>`
-      );
+      return `
+        <div class="search-result" data-idx="${i}"${cls}>
+            <div class="result-chapter">${escapeHtml(chapter)}</div>
+            <div class="result-text">...${escapeHtml(m.before)}<em>${escapeHtml(m.match)}</em>${escapeHtml(m.after)}...</div>
+        </div>
+        `;
     })
     .join("");
 }
@@ -1138,9 +1137,7 @@ function initKeySettings() {
     container.innerHTML = names
       .map(([name, label]) => {
         const key = k[name] || "?";
-        return (
-          `<div class="key-row"><span class="key-label">${label}</span><button class="key-btn" data-name="${name}">${getKeyLabel(key)}</button></div>`
-        );
+        return `<div class="key-row"><span class="key-label">${label}</span><button class="key-btn" data-name="${name}">${getKeyLabel(key)}</button></div>`;
       })
       .join("");
   }
