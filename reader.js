@@ -128,24 +128,16 @@ function renderBookshelf() {
           ? Math.round((book.currentChapter / chapterCount) * 100)
           : 0;
       return (
-        '<div class="book-card" data-index="' +
-        i +
-        '">' +
-        '<button class="delete-btn" data-index="' +
-        i +
-        '">&times;</button>' +
-        '<div class="book-title">' +
-        escapeHtml(book.name) +
-        "</div>" +
-        '<div class="book-progress">' +
-        '<span class="book-chapter-count">共 ' +
-        chapterCount +
-        " 章</span>" +
-        (book.currentChapter !== undefined
-          ? '<span class="book-read-progress">已读 ' + progress + "%</span>"
-          : '<span class="book-read-progress" style="opacity:0.5">未读</span>') +
-        "</div>" +
-        "</div>"
+        `<div class="book-card" data-index="${i}">
+                    <button class="delete-btn" data-index="${i}">&times;</button>
+                    <div class="book-title">${escapeHtml(book.name)}</div>
+                    <div class="book-progress">
+                        <span class="book-chapter-count">共 ${chapterCount} 章</span>
+                        ${book.currentChapter !== undefined
+                          ? `<span class="book-read-progress">已读 ${progress}%</span>`
+                          : '<span class="book-read-progress" style="opacity:0.5">未读</span>'}
+                    </div>
+                </div>`
       );
     })
     .join("");
@@ -658,22 +650,10 @@ function renderSearchResults() {
       const cls =
         i === currentSearchIdx ? ' style="background:var(--hover-bg)"' : "";
       return (
-        '<div class="search-result" data-idx="' +
-        i +
-        '"' +
-        cls +
-        ">" +
-        '<div class="result-chapter">' +
-        escapeHtml(chapter) +
-        "</div>" +
-        '<div class="result-text">...' +
-        escapeHtml(m.before) +
-        "<em>" +
-        escapeHtml(m.match) +
-        "</em>" +
-        escapeHtml(m.after) +
-        "...</div>" +
-        "</div>"
+        `<div class="search-result" data-idx="${i}"${cls}>
+                    <div class="result-chapter">${escapeHtml(chapter)}</div>
+                    <div class="result-text">...${escapeHtml(m.before)}<em>${escapeHtml(m.match)}</em>${escapeHtml(m.after)}...</div>
+                </div>`
       );
     })
     .join("");
@@ -1159,13 +1139,7 @@ function initKeySettings() {
       .map(([name, label]) => {
         const key = k[name] || "?";
         return (
-          '<div class="key-row"><span class="key-label">' +
-          label +
-          '</span><button class="key-btn" data-name="' +
-          name +
-          '">' +
-          getKeyLabel(key) +
-          "</button></div>"
+          `<div class="key-row"><span class="key-label">${label}</span><button class="key-btn" data-name="${name}">${getKeyLabel(key)}</button></div>`
         );
       })
       .join("");
